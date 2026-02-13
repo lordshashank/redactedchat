@@ -1,5 +1,5 @@
 {
-  "name": "verify-balance-integration-test",
+  "name": "sharded-circuit-integration-test",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@noble/curves": "^1.4.0",
+    "circomlibjs": "^0.1.7",
     "viem": "^2.10.1"
   }
 }

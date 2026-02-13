@@ -1,4 +1,4 @@
-// Configurable constants for the integration test.
+// Configurable constants for the sharded circuit integration test.
 // All configuration is centralized here for easy modification.
 
 import { readFileSync, existsSync } from 'node:fs';
@@ -33,19 +33,11 @@ if (existsSync(envPath)) {
 // ---------------------------------------------------------------------------
 // Directory paths
 // ---------------------------------------------------------------------------
-export const CIRCUIT_DIR = resolve(__dirname, '..');
+export const CIRCUIT_A_DIR = resolve(__dirname, '..', 'identity_nullifier');
+export const CIRCUIT_B1_DIR = resolve(__dirname, '..', 'balance_header');
+export const CIRCUIT_B2_DIR = resolve(__dirname, '..', 'balance_mpt_step');
+export const CIRCUIT_B4_DIR = resolve(__dirname, '..', 'balance_final');
 
-// eth-proofs nargo cache path.
-// Derived from Nargo.toml: git URL (without https://) + tag
-// e.g. git = "https://github.com/lordshashank/eth-proofs", tag = "refactor/account-crate-visibility"
-//   -> "github.com/lordshashank/eth-proofs/refactor/account-crate-visibility"
-const ETH_PROOFS_NARGO_CACHE_PATH = 'github.com/lordshashank/eth-proofs/refactor/account-crate-visibility';
-const YARN_BIN_FILENAME = 'yarn-4.2.1.cjs';
-
-const NARGO_HOME = resolve(process.env.HOME, 'nargo');
-export const ETH_PROOFS_DIR = resolve(NARGO_HOME, ETH_PROOFS_NARGO_CACHE_PATH);
-export const ORACLE_DIR = resolve(ETH_PROOFS_DIR, 'ethereum/oracles');
-export const YARN_BIN = resolve(ETH_PROOFS_DIR, '.yarn/releases', YARN_BIN_FILENAME);
 
 // ---------------------------------------------------------------------------
 // Environment configuration
@@ -56,6 +48,9 @@ export const PUBLIC_BALANCE_ETH = process.env.PUBLIC_BALANCE || '0.001';
 export const NULLIFIER_BALANCE_ETH = process.env.NULLIFIER_BALANCE || PUBLIC_BALANCE_ETH;
 export const BLOCK_NUMBER = process.env.BLOCK_NUMBER ? BigInt(process.env.BLOCK_NUMBER) : null;
 export const PROVE_MODE = process.argv.includes('--prove');
+
+// Fixed blinding factor for test reproducibility
+export const BLINDING = process.env.BLINDING || '12345';
 
 // Build RPC URL: use explicit RPC_URL, or construct from ALCHEMY_API_KEY
 let rpcUrl = process.env.RPC_URL;
@@ -78,8 +73,6 @@ export const CHAIN_MAP = {
 
 // ---------------------------------------------------------------------------
 // Binary names (expected on PATH)
-// Install nargo: curl -L https://raw.githubusercontent.com/noir-lang/noirup/main/install | bash && noirup
-// Install bb:    curl -L https://raw.githubusercontent.com/AztecProtocol/aztec-packages/refs/heads/next/barretenberg/bbup/install | bash && bbup
 // ---------------------------------------------------------------------------
 export const NARGO_BIN = 'nargo';
 export const BB_BIN = 'bb';

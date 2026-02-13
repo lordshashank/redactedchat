@@ -4,71 +4,65 @@ Privacy-preserving chat identity using zero-knowledge proofs. Users prove they h
 
 ## How It Works
 
-RedactedChat uses a [Noir](https://noir-lang.org/) ZK circuit to generate a proof that:
+RedactedChat uses [Noir](https://noir-lang.org/) ZK circuits to generate a proof that:
 
 1. **You control a wallet** -- by verifying an ECDSA signature over a fixed identity message (`"RedactedChat:v0:identity"`)
-2. **Your balance meets a threshold** -- by fetching and verifying the account's Ethereum state proof (MPT proof via [eth-proofs](https://github.com/lordshashank/eth-proofs))
+2. **Your balance meets a threshold** -- by verifying the account's Ethereum state proof (block header RLP + MPT proof) entirely inside the circuit
 3. **You get a pseudonymous identity** -- a deterministic nullifier derived from `poseidon(poseidon(sig_r, sig_s), balance)`, so the same wallet + balance always produces the same identity
 
 The proof reveals only: chain ID, block number, the claimed balance threshold, the block hash, and the nullifier. The address, exact balance, and private key stay hidden.
+
+## Architecture
+
+The proof is split across 5 sub-circuits to fit within the browser's bb.js WASM proving limit (2^19 gates). All Ethereum data is pre-fetched in JavaScript and passed as circuit inputs -- no oracle server needed.
+
+```
+Circuit A (identity_nullifier)     63K gates
+    |  commitment
+Circuit B1 (balance_header)       221K gates
+    |  link_1
+Circuit B2 (balance_mpt_step)     434K gates   -- MPT nodes 0-3
+    |  link_2
+Circuit B3 (balance_mpt_step)     434K gates   -- MPT nodes 4-7 (same circuit)
+    |  link_3
+Circuit B4 (balance_final)        284K gates   -- remaining nodes + leaf + balance check
+```
+
+Inter-circuit integrity is maintained through Poseidon commitments (A -> B1) and blinded link commitments (B1 -> B2 -> B3 -> B4) that bind all private state across circuits.
+
+For the full design -- how linking works, what's public vs private, the soundness argument, and the shared library -- see **[circuits/ARCHITECTURE.md](circuits/ARCHITECTURE.md)**.
 
 ## Project Structure
 
 ```
 redactedchat/
-├── circuits/verify_balance/     # Noir ZK circuit
+├── circuits/
+│   ├── ARCHITECTURE.md           # Detailed sharding design doc
+│   ├── identity_nullifier/       # Circuit A: ECDSA + commitment + nullifier
+│   ├── balance_header/           # Circuit B1: block header RLP + block hash
+│   ├── balance_mpt_step/         # Circuit B2/B3: MPT node traversal (4 nodes each)
+│   ├── balance_final/            # Circuit B4: remaining nodes + leaf + account + balance
+│   ├── shared/                   # Noir lib: link commitments, MPT, RLP, account
+│   └── test/                     # Integration test against Sepolia
+├── frontend/                     # Next.js web app
 │   ├── src/
-│   │   ├── main.nr              # Circuit entrypoint
-│   │   ├── identity.nr          # EIP-191 signature verification + address derivation
-│   │   └── nullifier.nr         # Poseidon-based nullifier computation
-│   ├── test/                    # Integration tests (Sepolia)
-│   └── Nargo.toml               # Circuit dependencies
-├── frontend/                    # Next.js web app
-│   ├── src/
-│   │   ├── app/                 # Pages + API routes
-│   │   │   └── api/verify/      # Server-side proof verification endpoint
-│   │   ├── components/          # React components (ProveForm)
-│   │   ├── lib/noir/            # noir_js + bb.js proving pipeline
-│   │   ├── lib/oracles/         # eth-proofs oracle handlers (browser RPC)
-│   │   └── providers/           # RainbowKit + wagmi wallet providers
-│   └── public/circuits/         # Compiled circuit JSON
-└── docs/                        # Design specs and research
+│   │   ├── app/                  # Pages + API routes
+│   │   │   └── api/verify/       # Server-side 5-proof verification + link chain check
+│   │   ├── components/           # React components (ProveForm)
+│   │   ├── lib/noir/             # Proving pipeline, data fetching, MPT replay
+│   │   └── providers/            # RainbowKit + wagmi wallet providers
+│   └── public/circuits/          # Compiled circuit JSONs
 ```
 
-## Circuit
-
-The `verify_balance` circuit takes:
-
-| Input | Visibility | Type | Description |
-|-------|-----------|------|-------------|
-| `chain_id` | public | `u32` | Ethereum chain ID |
-| `block_number` | public | `u64` | Block to verify balance at |
-| `public_balance` | public | `u128` | Balance threshold (wei) revealed in proof |
-| `nullifier_balance` | private | `u128` | Balance used for nullifier derivation |
-| `signature` | private | `[u8; 64]` | ECDSA signature (r \|\| s) |
-| `public_key_x` | private | `[u8; 32]` | Signer's public key X coordinate |
-| `public_key_y` | private | `[u8; 32]` | Signer's public key Y coordinate |
-
-And returns (as public outputs):
-- `block_hash: [u8; 32]` -- the block hash from the verified header
-- `nullifier: Field` -- pseudonymous identity
-
-The circuit verifies the ECDSA signature, derives the Ethereum address from the public key, fetches the account state via oracle calls (verified by MPT proofs), checks that both `public_balance` and `nullifier_balance` are <= the on-chain balance, and computes the nullifier.
-
-**Stats**: ~218K ACIR opcodes, ~1.5M gates (UltraHonk)
-
-## Frontend
-
-Next.js app with RainbowKit wallet connection. The flow:
+## Frontend Flow
 
 1. User connects wallet (Sepolia or mainnet)
 2. Wallet signs the identity message via `personal_sign`
-3. Public key is recovered from the signature (via `viem.recoverPublicKey`)
-4. Circuit executes in-browser using `noir_js` -- oracle calls fetch `eth_getProof` and block headers via the wallet's RPC
-5. Proof is generated and sent to the `/api/verify` endpoint for server-side verification
-6. Verified results (nullifier, block hash, etc.) are displayed
-
-> **Note**: Browser-based proof generation currently hits a V8 WASM call stack depth limit for this circuit size (~1.5M gates). Server-side proving is the path forward. See `../aztec-packages/WASM_BUILD_NOTES.md` for details on the investigation.
+3. Public key is recovered from the signature
+4. Ethereum data is pre-fetched: block header + account state proof via `eth_getProof`
+5. All 5 circuits are executed sequentially (chaining return values), then proved sequentially via bb.js WASM
+6. 5 proofs are sent to `/api/verify` which verifies each proof and checks the cross-circuit link chain
+7. Verified results (nullifier, block hash, balance threshold) are displayed
 
 ## Prerequisites
 
@@ -79,23 +73,27 @@ Next.js app with RainbowKit wallet connection. The flow:
 
 ## Getting Started
 
-### Compile the circuit
+### Compile the circuits
 
 ```bash
-cd circuits/verify_balance
-~/.nargo/bin/nargo compile --silence-warnings
+for d in identity_nullifier balance_header balance_mpt_step balance_final; do
+  cd circuits/$d && ~/.nargo/bin/nargo compile --silence-warnings && cd ../..
+done
 ```
 
-This produces `target/verify_balance.json`. Copy it to the frontend:
+Copy compiled JSONs to the frontend:
 
 ```bash
-cp target/verify_balance.json ../../frontend/public/circuits/
+cp circuits/identity_nullifier/target/identity_nullifier.json frontend/public/circuits/
+cp circuits/balance_header/target/balance_header.json frontend/public/circuits/
+cp circuits/balance_mpt_step/target/balance_mpt_step.json frontend/public/circuits/
+cp circuits/balance_final/target/balance_final.json frontend/public/circuits/
 ```
 
 ### Run circuit tests
 
 ```bash
-cd circuits/verify_balance
+cd circuits/identity_nullifier
 ~/.nargo/bin/nargo test --silence-warnings
 ```
 
@@ -104,9 +102,9 @@ cd circuits/verify_balance
 Requires `PRIVATE_KEY` and `ALCHEMY_API_KEY` environment variables:
 
 ```bash
-cd circuits/verify_balance/test
-./run-integration.sh          # Execute only (witness + constraint check)
-./run-integration.sh --prove  # Full: execute + prove + verify
+cd circuits/test
+node integration.mjs              # Execute only (witness + constraint check)
+node integration.mjs --prove      # Full: execute + prove + verify
 ```
 
 ### Run the frontend
@@ -121,10 +119,10 @@ Open http://localhost:3000, connect a wallet, and generate a proof.
 
 ## Dependencies
 
-### Circuit
-- [eth-proofs](https://github.com/lordshashank/eth-proofs) -- Ethereum state proof verification in Noir (using local fork with `pub` field visibility)
-- [keccak256](https://github.com/noir-lang/keccak256) -- Keccak hash for EIP-191 and address derivation
-- [poseidon](https://github.com/noir-lang/poseidon) -- Poseidon hash for nullifier computation
+### Circuits
+- [keccak256](https://github.com/noir-lang/keccak256) v0.1.2 -- Keccak hash for EIP-191, address derivation, block hash, MPT node hashing
+- [poseidon](https://github.com/noir-lang/poseidon) v0.1.1 -- Poseidon hash for commitments, links, and nullifiers
+- `shared/` -- Vendored from [eth-proofs](https://github.com/lordshashank/eth-proofs): MPT verification, RLP decoding, account state parsing
 
 ### Frontend
 - `@noir-lang/noir_js` -- Circuit execution (witness generation)

@@ -5,13 +5,16 @@ import { useAccount, usePublicClient, useSignMessage } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { parseEther, type Hex } from "viem";
 import { IDENTITY_MESSAGE, recoverIdentity } from "@/lib/noir/identity";
-import { generateProof, type ProveInputs } from "@/lib/noir/prove";
-import { createForeignCallHandler } from "@/lib/oracles/handler";
+import {
+  generateShardedProof,
+  type CircuitAInputs,
+} from "@/lib/noir/prove";
+import { fetchProofData } from "@/lib/noir/fetchProofData";
 
 type Status =
   | "idle"
   | "signing"
-  | "fetching_block"
+  | "fetching_data"
   | "executing"
   | "proving"
   | "verifying"
@@ -27,6 +30,26 @@ interface VerifyResult {
   nullifier: string;
 }
 
+/** Generate a random blinding factor (31 bytes -> decimal string Field element) */
+function generateBlinding(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(31));
+  let value = 0n;
+  for (const b of bytes) {
+    value = (value << 8n) | BigInt(b);
+  }
+  return value.toString();
+}
+
+/** Convert 0x-prefixed address to array of 20 hex-prefixed byte strings */
+function addressToByteStrings(address: string): string[] {
+  const hex = address.startsWith("0x") ? address.slice(2) : address;
+  const bytes: string[] = [];
+  for (let i = 0; i < 40; i += 2) {
+    bytes.push("0x" + hex.slice(i, i + 2));
+  }
+  return bytes;
+}
+
 export function ProveForm() {
   const { address, isConnected, chain } = useAccount();
   const publicClient = usePublicClient();
@@ -36,16 +59,21 @@ export function ProveForm() {
   const [nullifierBalance, setNullifierBalance] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [statusMessage, setStatusMessage] = useState("");
+  const [completedSteps, setCompletedSteps] = useState<string[]>([]);
   const [result, setResult] = useState<VerifyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleProve = useCallback(async () => {
-    if (!isConnected || !publicClient || !chain) return;
+    if (!isConnected || !publicClient || !chain || !address) return;
 
     setStatus("signing");
     setStatusMessage("Signing identity message...");
+    setCompletedSteps([]);
     setResult(null);
     setError(null);
+
+    const addStep = (step: string) =>
+      setCompletedSteps((prev) => [...prev, step]);
 
     try {
       // Step 1: Sign identity message
@@ -53,57 +81,90 @@ export function ProveForm() {
         message: IDENTITY_MESSAGE,
       });
 
+      addStep("Identity message signed");
+
       // Step 2: Recover public key from signature
       const identity = await recoverIdentity(signature as Hex);
+      addStep("Public key recovered from signature");
 
       // Step 3: Get latest block number
-      setStatus("fetching_block");
+      setStatus("fetching_data");
       setStatusMessage("Fetching latest block...");
       const blockNumber = await publicClient.getBlockNumber();
+      addStep(`Block number fetched: ${blockNumber}`);
 
-      // Step 4: Prepare inputs
+      // Step 4: Fetch Ethereum proof data (replaces oracle)
+      setStatusMessage("Fetching Ethereum state proof...");
+      const proofData = await fetchProofData(
+        publicClient as Parameters<typeof fetchProofData>[0],
+        address as Hex,
+        blockNumber
+      );
+      addStep(`State proof fetched (${proofData.mpt.depth} nodes, ${proofData.header.rlpLen}B header)`);
+
+      // Step 5: Prepare inputs
       const pubBalanceWei = parseEther(publicBalance);
       const nullBalanceWei = nullifierBalance
         ? parseEther(nullifierBalance)
         : pubBalanceWei;
 
-      const inputs: ProveInputs = {
-        chain_id: chain.id.toString(),
-        block_number: blockNumber.toString(),
-        public_balance: pubBalanceWei.toString(),
+      const blinding = generateBlinding();
+
+      const inputsA: CircuitAInputs = {
         nullifier_balance: nullBalanceWei.toString(),
         signature: identity.signature,
         public_key_x: identity.pubKeyX,
         public_key_y: identity.pubKeyY,
+        blinding,
       };
 
-      // Step 5: Generate proof (execute circuit + prove)
+      // Step 6: Generate all 5 sharded proofs
       setStatus("executing");
-      const foreignCallHandler = createForeignCallHandler(publicClient);
-      const proofResult = await generateProof(
-        inputs,
-        foreignCallHandler,
+      addStep("Starting sharded proof generation (5 circuits)...");
+      const proofResult = await generateShardedProof(
+        inputsA,
+        proofData,
+        chain.id,
+        blockNumber,
+        pubBalanceWei,
+        nullBalanceWei,
+        blinding,
+        addressToByteStrings(address),
         (msg) => {
-          if (msg.includes("Executing")) {
-            setStatus("executing");
-          } else if (msg.includes("Generating proof")) {
+          // Track phase transitions
+          if (msg.includes("[7/12]")) {
             setStatus("proving");
+            addStep("All 5 circuits executed successfully");
+          }
+          if (msg.includes("[12/12]")) {
+            addStep("All 5 proofs generated");
           }
           setStatusMessage(msg);
         }
       );
+      addStep(
+        `Proofs ready (A:${proofResult.proofA.length}B B1:${proofResult.proofB1.length}B ` +
+        `B2:${proofResult.proofB2.length}B B3:${proofResult.proofB3.length}B B4:${proofResult.proofB4.length}B)`
+      );
 
-      // Step 6: Send to verification server
+      // Step 7: Send all 5 proofs to verification server
       setStatus("verifying");
-      setStatusMessage("Verifying proof on server...");
+      setStatusMessage("Verifying all 5 proofs on server...");
 
-      const proofArray = Array.from(proofResult.proof);
       const verifyResp = await fetch("/api/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          proof: proofArray,
-          publicInputs: proofResult.publicInputs,
+          proofA: Array.from(proofResult.proofA),
+          publicInputsA: proofResult.publicInputsA,
+          proofB1: Array.from(proofResult.proofB1),
+          publicInputsB1: proofResult.publicInputsB1,
+          proofB2: Array.from(proofResult.proofB2),
+          publicInputsB2: proofResult.publicInputsB2,
+          proofB3: Array.from(proofResult.proofB3),
+          publicInputsB3: proofResult.publicInputsB3,
+          proofB4: Array.from(proofResult.proofB4),
+          publicInputsB4: proofResult.publicInputsB4,
         }),
       });
 
@@ -115,7 +176,8 @@ export function ProveForm() {
       const verifyResult: VerifyResult = await verifyResp.json();
       setResult(verifyResult);
       setStatus("done");
-      setStatusMessage("Proof verified!");
+      addStep("Server verification complete");
+      setStatusMessage("All proofs verified!");
     } catch (err) {
       console.error("Prove error:", err);
       setError(err instanceof Error ? err.message : String(err));
@@ -126,6 +188,7 @@ export function ProveForm() {
     isConnected,
     publicClient,
     chain,
+    address,
     signMessageAsync,
     publicBalance,
     nullifierBalance,
@@ -194,10 +257,26 @@ export function ProveForm() {
             {isWorking ? "Working..." : "Generate Proof"}
           </button>
 
-          {statusMessage && (
-            <div className="p-3 bg-gray-800 rounded text-sm">
-              <StatusIndicator status={status} />
-              <span className="ml-2">{statusMessage}</span>
+          {(statusMessage || completedSteps.length > 0) && (
+            <div className="p-3 bg-gray-800 rounded text-sm space-y-1">
+              {completedSteps.map((step, i) => (
+                <div key={i} className="text-gray-400">
+                  <span className="text-green-400">&#10003;</span>
+                  <span className="ml-2">{step}</span>
+                </div>
+              ))}
+              {statusMessage && status !== "done" && status !== "error" && (
+                <div>
+                  <span className="animate-spin inline-block">&#9696;</span>
+                  <span className="ml-2">{statusMessage}</span>
+                </div>
+              )}
+              {status === "done" && statusMessage && (
+                <div>
+                  <span className="text-green-400">&#10003;</span>
+                  <span className="ml-2 text-green-400 font-medium">{statusMessage}</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -233,16 +312,6 @@ export function ProveForm() {
       )}
     </div>
   );
-}
-
-function StatusIndicator({ status }: { status: Status }) {
-  if (status === "done") {
-    return <span className="text-green-400">&#10003;</span>;
-  }
-  if (status === "error") {
-    return <span className="text-red-400">&#10007;</span>;
-  }
-  return <span className="animate-spin inline-block">&#9696;</span>;
 }
 
 function Field({
