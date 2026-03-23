@@ -1,0 +1,16 @@
+{
+  "name": "@redactedchat/circuits",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compile": "../../scripts/build-circuits.sh",
+    "test:integration": "cd test && node integration.mjs",
+    "test:integration:prove": "cd test && node integration.mjs --prove"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.4.0",
+    "@aztec/bb.js": "3.0.0-nightly.20251104",
+    "viem": "^2.10.1"
+  }
+}

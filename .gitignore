@@ -2,9 +2,9 @@
 node_modules/
 
 # Build outputs
-frontend/.next/
-frontend/out/
-frontend/build/
+packages/frontend/.next/
+packages/frontend/out/
+packages/frontend/build/
 **/target/
 **/Prover.toml
 

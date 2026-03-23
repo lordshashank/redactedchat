@@ -30,28 +30,32 @@ Circuit B4 (balance_final)        284K gates   -- remaining nodes + leaf + balan
 
 Inter-circuit integrity is maintained through Poseidon2 commitments (A -> B1) and blinded link commitments (B1 -> B2 -> B3 -> B4) that bind all private state across circuits.
 
-For the full design -- how linking works, what's public vs private, the soundness argument, and the shared library -- see **[circuits/ARCHITECTURE.md](circuits/ARCHITECTURE.md)**.
+For the full design -- how linking works, what's public vs private, the soundness argument, and the eth-primitives library -- see **[packages/circuits/ARCHITECTURE.md](packages/circuits/ARCHITECTURE.md)**.
 
 ## Project Structure
 
 ```
 redactedchat/
-├── circuits/
-│   ├── ARCHITECTURE.md           # Detailed sharding design doc
-│   ├── identity_nullifier/       # Circuit A: ECDSA + commitment + nullifier
-│   ├── balance_header/           # Circuit B1: block header RLP + block hash
-│   ├── balance_mpt_step/         # Circuit B2/B3: MPT node traversal (4 nodes each)
-│   ├── balance_final/            # Circuit B4: remaining nodes + leaf + account + balance
-│   ├── shared/                   # Noir lib: link commitments, MPT, RLP, account
-│   └── test/                     # Integration test against Sepolia
-├── frontend/                     # Next.js web app
-│   ├── src/
-│   │   ├── app/                  # Pages + API routes
-│   │   │   └── api/verify/       # Server-side 5-proof verification + link chain check
-│   │   ├── components/           # React components (ProveForm)
-│   │   ├── lib/noir/             # Proving pipeline, data fetching, MPT replay
-│   │   └── providers/            # RainbowKit + wagmi wallet providers
-│   └── public/circuits/          # Compiled circuit JSONs
+├── packages/
+│   ├── circuits/
+│   │   ├── ARCHITECTURE.md           # Detailed sharding design doc
+│   │   ├── identity_nullifier/       # Circuit A: ECDSA + commitment + nullifier
+│   │   ├── balance_header/           # Circuit B1: block header RLP + block hash
+│   │   ├── balance_mpt_step/         # Circuit B2/B3: MPT node traversal (4 nodes each)
+│   │   ├── balance_final/            # Circuit B4: remaining nodes + leaf + account + balance
+│   │   ├── eth-primitives/           # Noir lib: link commitments, MPT, RLP, account
+│   │   └── test/                     # Integration test against Sepolia
+│   └── frontend/                     # Next.js web app
+│       ├── src/
+│       │   ├── app/                  # Pages + API routes
+│       │   │   └── api/verify/       # Server-side 5-proof verification + link chain check
+│       │   ├── components/           # React components (ProveForm)
+│       │   ├── lib/noir/             # Proving pipeline, data fetching, MPT replay
+│       │   └── providers/            # RainbowKit + wagmi wallet providers
+│       └── public/circuits/          # Compiled circuit JSONs
+├── scripts/
+│   └── build-circuits.sh             # Compile circuits + copy artifacts to frontend
+└── package.json                      # npm workspaces root
 ```
 
 ## Frontend Flow
@@ -76,24 +80,15 @@ redactedchat/
 ### Compile the circuits
 
 ```bash
-for d in identity_nullifier balance_header balance_mpt_step balance_final; do
-  cd circuits/$d && ~/.nargo/bin/nargo compile --silence-warnings && cd ../..
-done
+./scripts/build-circuits.sh
 ```
 
-Copy compiled JSONs to the frontend:
-
-```bash
-cp circuits/identity_nullifier/target/identity_nullifier.json frontend/public/circuits/
-cp circuits/balance_header/target/balance_header.json frontend/public/circuits/
-cp circuits/balance_mpt_step/target/balance_mpt_step.json frontend/public/circuits/
-cp circuits/balance_final/target/balance_final.json frontend/public/circuits/
-```
+This compiles all circuits and copies the JSON artifacts to `packages/frontend/public/circuits/`.
 
 ### Run circuit tests
 
 ```bash
-cd circuits/identity_nullifier
+cd packages/circuits/identity_nullifier
 ~/.nargo/bin/nargo test --silence-warnings
 ```
 
@@ -102,15 +97,13 @@ cd circuits/identity_nullifier
 Requires `PRIVATE_KEY` and `ALCHEMY_API_KEY` environment variables:
 
 ```bash
-cd circuits/test
-node integration.mjs              # Execute only (witness + constraint check)
-node integration.mjs --prove      # Full: execute + prove + verify
+npm run test:integration           # Execute only (witness + constraint check)
+npm run test:integration:prove     # Full: execute + prove + verify
 ```
 
 ### Run the frontend
 
 ```bash
-cd frontend
 npm install
 npm run dev
 ```
@@ -122,7 +115,7 @@ Open http://localhost:3000, connect a wallet, and generate a proof.
 ### Circuits
 - [keccak256](https://github.com/noir-lang/keccak256) v0.1.2 -- Keccak hash for EIP-191, address derivation, block hash, MPT node hashing
 - [poseidon](https://github.com/noir-lang/poseidon) v0.1.1 -- Poseidon2 hash for commitments, links, and nullifiers
-- `shared/` -- Vendored from [eth-proofs](https://github.com/lordshashank/eth-proofs): MPT verification, RLP decoding, account state parsing
+- `eth-primitives/` -- Vendored from [eth-proofs](https://github.com/lordshashank/eth-proofs): MPT verification, RLP decoding, account state parsing
 
 ### Frontend
 - `@noir-lang/noir_js` -- Circuit execution (witness generation)
