@@ -20,7 +20,7 @@ export function PageHeader({ title, subtitle, showBack, onBack, rightContent }: 
           </button>
         )}
         <div>
-          <h1 className="font-bold text-lg text-on-surface matrix-glow">{title}</h1>
+          <h1 className="font-bold text-lg text-primary matrix-glow">{title}</h1>
           {subtitle && (
             <p className="text-[10px] text-on-surface-variant/60 uppercase tracking-widest font-mono">
               {subtitle}

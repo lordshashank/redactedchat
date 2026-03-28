@@ -9,7 +9,7 @@ import type { ProofData as EthProofData } from "./fetchProofData";
 // ---- Input types ----
 
 export interface CircuitAInputs {
-  nullifier_balance: string;
+  nullifier_seed: string;
   signature: string[];
   public_key_x: string[];
   public_key_y: string[];
@@ -57,7 +57,7 @@ const cacheB4 = { get value() { return circuitB4Cache; }, set value(v) { circuit
 
 // ---- Constants matching circuit definitions ----
 
-const MAX_HEADER_RLP_LEN = 708;
+const MAX_HEADER_RLP_LEN = 741;
 const MAX_NODE_LEN = 532;
 const MAX_ACCOUNT_LEAF_LEN = 148;
 const MAX_ACCOUNT_STATE_LEN = 110;
@@ -102,7 +102,7 @@ export async function generateShardedProof(
   proofData: EthProofData,
   blockNumber: bigint,
   publicBalance: bigint,
-  nullifierBalance: bigint,
+  nullifierSeed: bigint,
   blinding: string,
   address: string[],
   onStatus?: (status: string) => void
@@ -157,7 +157,7 @@ export async function generateShardedProof(
     block_number: blockNumber.toString(),
     commitment_in: commitment,
     address,
-    nullifier_balance: nullifierBalance.toString(),
+    nullifier_seed: nullifierSeed.toString(),
     blinding,
     header_rlp: toByteStrings(headerRlpPadded),
     header_rlp_len: proofData.header.rlpLen.toString(),
@@ -207,7 +207,7 @@ export async function generateShardedProof(
     curr_hash: toByteStrings(stateRootArr),
     address_hash: addressHashBytes,
     key_ptr_in: "0",
-    nullifier_balance: nullifierBalance.toString(),
+    nullifier_seed: nullifierSeed.toString(),
     blinding,
     depth: depth.toString(),
     start_index: "0",
@@ -251,7 +251,7 @@ export async function generateShardedProof(
     curr_hash: toByteStrings(afterB2.currHash),
     address_hash: addressHashBytes,
     key_ptr_in: afterB2.keyPtr.toString(),
-    nullifier_balance: nullifierBalance.toString(),
+    nullifier_seed: nullifierSeed.toString(),
     blinding,
     depth: depth.toString(),
     start_index: "4",
@@ -300,7 +300,7 @@ export async function generateShardedProof(
     curr_hash: toByteStrings(afterB3.currHash),
     address_hash: addressHashBytes,
     key_ptr_in: afterB3.keyPtr.toString(),
-    nullifier_balance: nullifierBalance.toString(),
+    nullifier_seed: nullifierSeed.toString(),
     blinding,
     depth: depth.toString(),
     nodes: nodesB4,

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
 import { Web3Provider } from "@/providers/Web3Provider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
+import { AuthProvider } from "@/providers/AuthProvider";
+import { ToastProvider } from "@/providers/ToastProvider";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -63,7 +65,11 @@ export default function RootLayout({
         <div className="grain-overlay" />
         <div className="scanline-overlay" />
         <ThemeProvider>
-          <Web3Provider>{children}</Web3Provider>
+          <Web3Provider>
+            <AuthProvider>
+              <ToastProvider>{children}</ToastProvider>
+            </AuthProvider>
+          </Web3Provider>
         </ThemeProvider>
       </body>
     </html>

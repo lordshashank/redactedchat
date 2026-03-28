@@ -22,6 +22,7 @@ export interface BlockHeader {
   blobGasUsed?: Hex;
   excessBlobGas?: Hex;
   parentBeaconBlockRoot?: Hex;
+  requestsHash?: Hex;
 }
 
 function unpadded(hex: Hex) {
@@ -65,6 +66,9 @@ export function headerToRlpFields(blockHeader: BlockHeader): Hex[] {
   if (blockHeader.parentBeaconBlockRoot !== undefined) {
     headerFields.push(blockHeader.parentBeaconBlockRoot);
   }
+  if (blockHeader.requestsHash !== undefined) {
+    headerFields.push(blockHeader.requestsHash);
+  }
   return headerFields;
 }
 
@@ -95,6 +99,7 @@ export interface Block {
   blobGasUsed?: bigint;
   excessBlobGas?: bigint;
   parentBeaconBlockRoot?: Hex | null;
+  requestsHash?: Hex | null;
 }
 
 export function blockToHeader(block: Block): BlockHeader {
@@ -129,5 +134,6 @@ export function blockToHeader(block: Block): BlockHeader {
         ? toHexString(block.excessBlobGas)
         : undefined,
     parentBeaconBlockRoot: block.parentBeaconBlockRoot ?? undefined,
+    requestsHash: block.requestsHash ?? undefined,
   };
 }
