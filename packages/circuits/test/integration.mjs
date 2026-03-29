@@ -414,12 +414,14 @@ async function main() {
   }
 
   // =========================================================================
-  // Phase B4: Balance Final (nodes 8-9 + leaf)
+  // Phase B4: Balance Final (leaf only -- depth capped at 8, no nodes 8-9)
   // =========================================================================
   log('');
   log('=== Phase B4: Balance Final ===');
 
-  // Replay MPT path through nodes 0-7 to get intermediate state for B4
+  // Replay MPT path through all internal nodes (0 to depth-2) to get the
+  // hash that the leaf will be verified against. B3 ends at node index 7 max
+  // (depth <= 8 means at most 7 internal nodes, indices 0-6).
   const afterB3 = replayMptPath(
     proofData.header.stateRoot,
     proofData.addressHash,
@@ -428,17 +430,6 @@ async function main() {
     Math.min(8, internalNodes.length),
   );
   log(`After B3: keyPtr=${afterB3.keyPtr}, currHash=${Array.from(afterB3.currHash.slice(0, 4)).map(b => b.toString(16).padStart(2, '0')).join('')}...`);
-
-  // Remaining internal nodes (indices 8-9)
-  const nodesB4 = [];
-  for (let i = 0; i < 2; i++) {
-    const idx = 8 + i;
-    if (idx < internalNodes.length) {
-      nodesB4.push(rightPadArray(internalNodes[idx], 532));
-    } else {
-      nodesB4.push(new Array(532).fill(0));
-    }
-  }
 
   const leafPadded = rightPadArray(proofData.mpt.leaf, 148);
   const accountValuePadded = leftPadArray(proofData.account.rlpBytes, 110);
@@ -458,7 +449,6 @@ async function main() {
     `nullifier_seed = "${nullifierSeedWei.toString()}"`,
     `blinding = "${BLINDING}"`,
     `depth = ${depth}`,
-    `nodes = ${format2DProverArray(nodesB4)}`,
     `leaf = ${formatProverArray(leafPadded)}`,
     `account_value = ${formatProverArray(accountValuePadded)}`,
     `account_nonce = ${proofData.account.nonce.toString()}`,
@@ -508,7 +498,7 @@ async function main() {
   log('    - MPT node hash verification (4 nodes)');
   log('  Circuit B4 (balance_final):');
   log('    - Link commitment from B3');
-  log('    - Remaining MPT nodes + leaf verification');
+  log('    - Leaf verification (depth capped at 8, nodes 8-9 removed)');
   log('    - Account RLP decoding');
   log('    - Balance assertions');
   if (PROVE_MODE) {

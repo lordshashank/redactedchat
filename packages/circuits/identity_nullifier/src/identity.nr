@@ -23,26 +23,17 @@ global PREFIXED_MSG_LEN: u32 = 52;
 /// and derives the signer's Ethereum address.
 ///
 /// Steps:
-/// 1. Constructs the EIP-191 prefixed message
-/// 2. Hashes it with keccak256
-/// 3. Verifies the ECDSA signature
-/// 4. Derives the Ethereum address from the public key
+/// 1. Uses the precomputed EIP-191 message hash (compile-time constant)
+/// 2. Verifies the ECDSA signature
+/// 3. Derives the Ethereum address from the public key
 pub fn verify_identity_and_derive_address(
     signature: [u8; 64],
     public_key_x: [u8; 32],
     public_key_y: [u8; 32],
 ) -> [u8; 20] {
-    // Build prefixed message: ETH_PREFIX (28 bytes) ++ IDENTITY_MESSAGE (24 bytes) = 52 bytes
-    let mut prefixed_msg: [u8; PREFIXED_MSG_LEN] = [0; PREFIXED_MSG_LEN];
-    for i in 0..28 {
-        prefixed_msg[i] = ETH_PREFIX[i];
-    }
-    for i in 0..24 {
-        prefixed_msg[28 + i] = IDENTITY_MESSAGE[i];
-    }
-
-    // Hash the prefixed message
-    let message_hash: [u8; 32] = keccak256(prefixed_msg, PREFIXED_MSG_LEN);
+    // ETH_PREFIX ++ IDENTITY_MESSAGE is fully determined at compile time;
+    // MESSAGE_HASH is the precomputed keccak256 of that fixed input.
+    let message_hash: [u8; 32] = MESSAGE_HASH;
 
     // Verify ECDSA signature
     let valid = std::ecdsa_secp256k1::verify_signature(
@@ -118,7 +109,9 @@ global TEST_ADDRESS: [u8; 20] = [
     0xff, 0xb9, 0x22, 0x66,
 ];
 
-global TEST_MESSAGE_HASH: [u8; 32] = [
+/// Precomputed keccak256(ETH_PREFIX ++ IDENTITY_MESSAGE).
+/// Verified by test_message_hash_matches_expected below.
+global MESSAGE_HASH: [u8; 32] = [
     0x6c, 0xf8, 0x94, 0x90, 0x34, 0xbd, 0xf0, 0xca,
     0xfc, 0x4a, 0x37, 0x88, 0x45, 0x2d, 0x1f, 0x20,
     0xe6, 0xdb, 0x00, 0x9d, 0xb2, 0xa8, 0x9c, 0xab,
@@ -127,11 +120,11 @@ global TEST_MESSAGE_HASH: [u8; 32] = [
 
 #[test]
 fn test_message_hash_matches_expected() {
-    // Verify the circuit's keccak256(prefix || message) matches the hash
-    // computed externally by viem/ethers
+    // Verify MESSAGE_HASH matches keccak256(ETH_PREFIX || IDENTITY_MESSAGE),
+    // confirming the precomputed constant is correct.
     let hash = compute_message_hash();
     for i in 0..32 {
-        assert(hash[i] == TEST_MESSAGE_HASH[i]);
+        assert(hash[i] == MESSAGE_HASH[i]);
     }
 }
 

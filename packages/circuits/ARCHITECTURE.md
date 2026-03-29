@@ -8,11 +8,11 @@ UltraHonk circuits are padded to the next power-of-2 size. bb.js WASM in the bro
 
 | Circuit | Gates | Padded to | Role |
 |---------|-------|-----------|------|
-| A: `identity_nullifier` | 63,350 | 2^17 (131K) | ECDSA signature verify, address derivation, commitment, nullifier |
-| B1: `balance_header` | 221,318 | 2^18 (262K) | Block header RLP verify, block hash, state root extraction |
-| B2: `balance_mpt_step` | 434,451 | 2^19 (524K) | MPT traversal nodes 0-3 |
-| B3: `balance_mpt_step` | 434,451 | 2^19 (524K) | MPT traversal nodes 4-7 (same circuit, different inputs) |
-| B4: `balance_final` | 284,421 | 2^19 (524K) | MPT nodes 8-9, leaf verification, account RLP, balance assertion |
+| A: `identity_nullifier` | 59,944 | 2^17 (131K) | ECDSA signature verify, address derivation, commitment, nullifier |
+| B1: `balance_header` | 218,599 | 2^18 (262K) | Block header RLP verify, block hash, state root extraction |
+| B2: `balance_mpt_step` | 425,077 | 2^19 (524K) | MPT traversal nodes 0-3 |
+| B3: `balance_mpt_step` | 425,077 | 2^19 (524K) | MPT traversal nodes 4-7 (same circuit, different inputs) |
+| B4: `balance_final` | 70,606 | 2^17 (131K) | Leaf verification, account RLP, balance assertion (depth capped at 8) |
 
 Gate counts measured with `bb gates` (UltraHonk scheme). The largest circuit (B2/B3) uses 434K of the 524K available gates at 2^19.
 
@@ -68,7 +68,7 @@ Gate counts measured with `bb gates` (UltraHonk scheme). The largest circuit (B2
                     |   Circuit B4          |
                     |   balance_final       |
                     |                       |
-                    |  MPT nodes 8-9        |
+                    |  depth assert (<= 8)  |
                     |  leaf verification    |
                     |  account RLP decode   |
                     |  balance >= threshold |
@@ -137,12 +137,11 @@ The same blinding factor is used in both the commitment (A -> B1) and all link c
 **Private inputs:** `signature`, `public_key_x`, `public_key_y`, `nullifier_seed`, `blinding`
 **Public outputs:** `commitment`, `nullifier`
 
-1. Constructs the EIP-191 prefixed message: `\x19Ethereum Signed Message:\n24` + `ghostbalance:v0:identity`
-2. Hashes it with keccak256
-3. Verifies the ECDSA secp256k1 signature against the provided public key
-4. Derives the Ethereum address: `keccak256(pubkey_x || pubkey_y)[12..32]`
-5. Computes `commitment = Poseidon2(Poseidon2(address, nullifier_seed), blinding)`
-6. Computes `nullifier = Poseidon2(Poseidon2(sig_r, sig_s), nullifier_seed)`
+1. Uses `MESSAGE_HASH` -- a precomputed `global` constant equal to `keccak256(EIP-191_prefix || "ghostbalance:v0:identity")`. The prefix and message are both compile-time constants so their hash is fixed; computing it in-circuit was a wasted keccak call.
+2. Verifies the ECDSA secp256k1 signature against the provided public key and `MESSAGE_HASH`
+3. Derives the Ethereum address: `keccak256(pubkey_x || pubkey_y)[12..32]`
+4. Computes `commitment = Poseidon2(Poseidon2(address, nullifier_seed), blinding)`
+5. Computes `nullifier = Poseidon2(Poseidon2(sig_r, sig_s), nullifier_seed)`
 
 The nullifier is deterministic for a given wallet + nullifier_seed pair. Because Ethereum uses deterministic ECDSA (RFC 6979), re-signing the same message with the same wallet always produces the same `(r, s)` values, making the nullifier stable across proof sessions.
 
@@ -180,11 +179,11 @@ Same circuit binary as B2, just called with `start_index = 4` and the intermedia
 ### Circuit B4: `balance_final`
 
 **Public inputs:** `link_in`, `public_balance`
-**Private inputs:** `curr_hash`, `address_hash`, `key_ptr_in`, `nullifier_seed`, `blinding`, `depth`, `nodes[2][532]`, `leaf[148]`, `account_value[110]`, `account_nonce`, `account_balance`, `account_storage_root`, `account_code_hash`
+**Private inputs:** `curr_hash`, `address_hash`, `key_ptr_in`, `nullifier_seed`, `blinding`, `depth`, `leaf[148]`, `account_value[110]`, `account_nonce`, `account_balance`, `account_storage_root`, `account_code_hash`
 **Public outputs:** none (all assertions, no return value)
 
-1. Asserts link_in matches
-2. Processes remaining internal nodes (indices 8-9, if they exist)
+1. Asserts `depth <= 8` -- the Ethereum state trie cannot exceed depth 8 for any realistic account count (depth 9 requires ~4B accounts, depth 10 requires ~70B). This eliminates two phantom `keccak256(node, 532)` calls that existed in a previous version for nodes 8-9 but were never executed for real accounts.
+2. Asserts link_in matches
 3. Verifies the MPT leaf: `keccak256(leaf) == curr_hash`, key nibbles consumed
 4. Verifies account RLP: decodes `account_value` and asserts fields match (`nonce`, `balance`, `storage_root`, `code_hash`)
 5. Asserts `public_balance <= account_balance` (the public threshold claim)

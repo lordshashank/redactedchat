@@ -1,11 +1,13 @@
 use eth_primitives::mpt;
 use eth_primitives::link::compute_link;
-use eth_primitives::consts::{MAX_NODE_LEN, MAX_PREFIXED_KEY_NIBBLE_LEN, MAX_ACCOUNT_LEAF_LEN, MAX_ACCOUNT_STATE_LEN};
+use eth_primitives::consts::{MAX_PREFIXED_KEY_NIBBLE_LEN, MAX_ACCOUNT_LEAF_LEN, MAX_ACCOUNT_STATE_LEN};
 use eth_primitives::types::Bytes32;
 use eth_primitives::bytes::{right_pad, bytes_to_nibbles};
 use eth_primitives::fragment::Fragment;
 
-global REMAINING_NODES: u32 = 2;
+// Maximum supported MPT depth. Ethereum state trie depth is bounded by
+// log16(accounts): depth Capped at 8
+global MAX_SUPPORTED_DEPTH: u64 = 8;
 
 fn main(
     // Public inputs
@@ -19,7 +21,6 @@ fn main(
     nullifier_seed: u128,
     blinding: Field,
     depth: u64,
-    nodes: [[u8; MAX_NODE_LEN]; REMAINING_NODES],
     leaf: [u8; MAX_ACCOUNT_LEAF_LEN],
     account_value: [u8; MAX_ACCOUNT_STATE_LEN],
     account_nonce: u64,
@@ -27,6 +28,10 @@ fn main(
     account_storage_root: Bytes32,
     account_code_hash: Bytes32,
 ) {
+    // Enforce depth cap. B2 covers nodes 0-3, B3 covers nodes 4-7; together
+    // they handle all internal nodes for depth <= 8 (max internal index = 6).
+    assert(depth <= MAX_SUPPORTED_DEPTH, "MPT depth exceeds supported maximum of 8");
+
     // 1. Verify incoming link
     assert(
         compute_link(curr_hash, address_hash, key_ptr_in, nullifier_seed, blinding) == link_in,
@@ -42,23 +47,12 @@ fn main(
     let key_nibbles = bytes_to_nibbles(Fragment::from_vec(key_padded));
 
     let mut kp = key_ptr_in;
-    let mut hash = curr_hash;
 
-    // 3. Process remaining internal nodes (indices 8-9, if depth > 9)
-    for j in 0..REMAINING_NODES {
-        let global_idx = 8 + j as u64;
-        if global_idx < depth - 1 {
-            mpt::verify_node_hash(nodes[j], hash);
-            let next = mpt::extract_hash(nodes[j], key_nibbles, &mut kp);
-            hash = next.data;
-        }
-    }
-
-    // 4. Verify leaf node
-    mpt::verify_node_hash(leaf, hash);
+    // 3. Verify leaf node (curr_hash from B3 is the direct parent of the leaf)
+    mpt::verify_node_hash(leaf, curr_hash);
     mpt::verify_leaf(leaf, key_nibbles, &mut kp, account_value);
 
-    // 5. Verify account RLP matches claimed fields
+    // 4. Verify account RLP matches claimed fields
     eth_primitives::account::assert_account_equals(
         account_value,
         account_nonce,
@@ -67,7 +61,7 @@ fn main(
         account_code_hash,
     );
 
-    // 6. Balance check
+    // 5. Balance check
     let balance_wei: u128 = account_balance as u128;
     assert(public_balance <= balance_wei, "public_balance exceeds actual balance");
 }
