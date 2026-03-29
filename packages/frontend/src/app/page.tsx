@@ -123,17 +123,8 @@ function FeedRightSidebar() {
       </section>
 
       {/* Footer */}
-      <footer className="mt-8 px-4 flex flex-wrap gap-x-4 gap-y-2 font-mono text-[10px] text-on-surface-variant/50 uppercase">
-        <p className="w-full mb-2">&copy; 2024 TERMINAL.GHOSTBALANCE.CHAT</p>
-        <a className="hover:text-primary transition-all" href="#">
-          PRIVACY_MASK
-        </a>
-        <a className="hover:text-primary transition-all" href="#">
-          TERMS_OF_SERVICE
-        </a>
-        <a className="hover:text-primary transition-all" href="#">
-          KERNEL_STATUS
-        </a>
+      <footer className="mt-8 px-4 font-mono text-[10px] text-on-surface-variant/50 uppercase">
+        <p>&copy; 2026 ghostbalance.chat</p>
       </footer>
     </>
   );

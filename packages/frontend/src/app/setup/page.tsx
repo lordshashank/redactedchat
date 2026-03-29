@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useCallback, Suspense } from "react";
-import { useAccount, useBalance, useConfig, useDisconnect, usePublicClient, useSignMessage } from "wagmi";
+import { useAccount, useBalance, useConfig, useDisconnect, useSignMessage } from "wagmi";
 import { getPublicClient } from "wagmi/actions";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { formatEther, parseEther, type Hex } from "viem";
+import { PROOF_CHAIN } from "@/providers/Web3Provider";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AppLayout } from "@/components/AppLayout";
@@ -183,8 +184,8 @@ function OnboardingSidebar({
         </p>
       </section>
 
-      <footer className="px-5 text-[10px] text-on-surface-variant/50 flex flex-wrap gap-x-4 gap-y-2 uppercase tracking-widest font-mono">
-        <p className="w-full mb-2">&copy; 2024 TERMINAL.GHOSTBALANCE.CHAT</p>
+      <footer className="px-5 text-[10px] text-on-surface-variant/50 uppercase tracking-widest font-mono">
+        <p>&copy; 2026 ghostbalance.chat</p>
       </footer>
     </>
   );
@@ -194,10 +195,9 @@ function SetupPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isReprove = searchParams.get("reprove") === "true";
-  const { address, isConnected, isReconnecting, chain } = useAccount();
-  const { data: walletBalance } = useBalance({ address });
+  const { address, isConnected, isReconnecting } = useAccount();
+  const { data: walletBalance } = useBalance({ address, chainId: PROOF_CHAIN.id });
   const wagmiConfig = useConfig();
-  const publicClientHook = usePublicClient();
   const { signMessageAsync } = useSignMessage();
   const { disconnect } = useDisconnect();
   const { user, refreshProfile } = useAuth();
@@ -226,16 +226,16 @@ function SetupPageInner() {
     status !== "error" &&
     status !== "profile_details";
 
+  const hasOnChainBalance = walletBalance && walletBalance.value > 0n;
   const canGenerateProof =
-    isConnected && !isReconnecting && publicBalance && parseFloat(publicBalance) >= 0 && !isWorking;
+    isConnected && !isReconnecting && hasOnChainBalance && publicBalance && parseFloat(publicBalance) >= 0 && !isWorking;
 
   const proofCompleted = status === "profile_details" || status === "done";
 
   const handleProve = useCallback(async () => {
     if (!isConnected || !address) return;
 
-    const publicClient = publicClientHook ?? getPublicClient(wagmiConfig);
-    const activeChain = chain ?? wagmiConfig.chains[0];
+    const publicClient = getPublicClient(wagmiConfig, { chainId: PROOF_CHAIN.id });
     if (!publicClient) return;
 
     setStatus("signing");
@@ -416,7 +416,7 @@ function SetupPageInner() {
       setStatus("error");
       setStatusMessage("");
     }
-  }, [isConnected, publicClientHook, wagmiConfig, chain, address, signMessageAsync, publicBalance, nullifierSeed, isReprove, user, refreshProfile, router]);
+  }, [isConnected, address, wagmiConfig, signMessageAsync, publicBalance, nullifierSeed, isReprove, user, refreshProfile, router]);
 
   const handleSaveProfile = async () => {
     try {
@@ -517,13 +517,20 @@ function SetupPageInner() {
               </ConnectButton.Custom>
             )}
             {isConnected && (
-              <div className="flex items-center gap-4 text-[10px] font-mono uppercase tracking-widest text-on-surface-variant/60">
-                {chain && <span>Network: {chain.name} (Chain {chain.id})</span>}
-                {walletBalance && (
-                  <>
-                    <span className="text-outline">|</span>
-                    <span>Balance: <span className="text-primary font-bold">{parseFloat(walletBalance.formatted).toFixed(4)} {walletBalance.symbol}</span></span>
-                  </>
+              <div className="space-y-2">
+                <div className="flex items-center gap-4 text-[10px] font-mono uppercase tracking-widest text-on-surface-variant/60">
+                  <span>Network: {PROOF_CHAIN.name}</span>
+                  {walletBalance && (
+                    <>
+                      <span className="text-outline">|</span>
+                      <span>Balance: <span className="text-primary font-bold">{parseFloat(walletBalance.formatted).toFixed(4)} {walletBalance.symbol}</span></span>
+                    </>
+                  )}
+                </div>
+                {walletBalance && walletBalance.value === 0n && (
+                  <p className="text-[11px] text-red-400/80 font-mono">
+                    This wallet has no balance on {PROOF_CHAIN.name}. You need ETH on this network to generate a proof.
+                  </p>
                 )}
               </div>
             )}

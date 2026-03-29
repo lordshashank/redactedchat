@@ -15,7 +15,7 @@ interface ComposeBoxProps {
 }
 
 export function ComposeBox({
-  placeholder = "Input cryptographic stream...",
+  placeholder = "What's on your mind, anon?",
   submitLabel = "BROADCAST",
   pendingLabel = "SENDING...",
   avatarKey,

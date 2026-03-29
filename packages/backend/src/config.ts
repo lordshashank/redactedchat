@@ -51,12 +51,12 @@ export function loadConfig(): Config {
     uploadMaxSize: process.env.UPLOAD_MAX_SIZE
       ? parseInt(process.env.UPLOAD_MAX_SIZE, 10)
       : undefined,
-    sessionDurationSeconds: parseInt(process.env.SESSION_DURATION_SECONDS || "3600", 10),
+    sessionDurationSeconds: parseInt(process.env.SESSION_DURATION_SECONDS || "3888000", 10),
     trendingWindowHours: parseInt(process.env.TRENDING_WINDOW_HOURS || "24", 10),
     maxBodySize: parseInt(process.env.MAX_BODY_SIZE || "1048576", 10),
     defaultPageLimit: parseInt(process.env.DEFAULT_PAGE_LIMIT || "20", 10),
     maxPageLimit: parseInt(process.env.MAX_PAGE_LIMIT || "50", 10),
-    postMaxLength: parseInt(process.env.POST_MAX_LENGTH || "2000", 10),
+    postMaxLength: parseInt(process.env.POST_MAX_LENGTH || "10000", 10),
     bioMaxLength: parseInt(process.env.BIO_MAX_LENGTH || "500", 10),
     messageMaxLength: parseInt(process.env.MESSAGE_MAX_LENGTH || "5000", 10),
     maxPollOptions: parseInt(process.env.MAX_POLL_OPTIONS || "6", 10),
