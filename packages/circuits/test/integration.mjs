@@ -420,7 +420,7 @@ async function main() {
   log('=== Phase B4: Balance Final ===');
 
   // Replay MPT path through all internal nodes (0 to depth-2) to get the
-  // hash that the leaf will be verified against. B3 ends at node index 7 max
+  // hash that the leaf will be verified against. B3 ends at node index 6 max
   // (depth <= 8 means at most 7 internal nodes, indices 0-6).
   const afterB3 = replayMptPath(
     proofData.header.stateRoot,

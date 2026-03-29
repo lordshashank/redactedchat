@@ -182,7 +182,7 @@ Same circuit binary as B2, just called with `start_index = 4` and the intermedia
 **Private inputs:** `curr_hash`, `address_hash`, `key_ptr_in`, `nullifier_seed`, `blinding`, `depth`, `leaf[148]`, `account_value[110]`, `account_nonce`, `account_balance`, `account_storage_root`, `account_code_hash`
 **Public outputs:** none (all assertions, no return value)
 
-1. Asserts `depth <= 8` -- the Ethereum state trie cannot exceed depth 8 for any realistic account count (depth 9 requires ~4B accounts, depth 10 requires ~70B). This eliminates two phantom `keccak256(node, 532)` calls that existed in a previous version for nodes 8-9 but were never executed for real accounts.
+1. Asserts `depth <= 9` -- the Ethereum state trie cannot exceed depth 9 for any realistic account count. 
 2. Asserts link_in matches
 3. Verifies the MPT leaf: `keccak256(leaf) == curr_hash`, key nibbles consumed
 4. Verifies account RLP: decodes `account_value` and asserts fields match (`nonce`, `balance`, `storage_root`, `code_hash`)
