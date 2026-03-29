@@ -53,6 +53,103 @@ export async function attachAttachmentsToRows(
   }
 }
 
+/**
+ * Fire-and-forget notification insert. Never throws, never blocks the caller.
+ * When `dedup` is true, skips if an identical notification already exists.
+ */
+export function notify(
+  db: DbAdapter,
+  opts: {
+    recipient: string;
+    type: string;
+    actor: string;
+    postId?: string;
+    conversationId?: string;
+    dedup?: boolean;
+  },
+): void {
+  const { recipient, type, actor, postId, conversationId, dedup } = opts;
+
+  if (recipient === actor) return;
+
+  if (dedup) {
+    const conditions = [
+      "recipient_nullifier = $1",
+      "type = $2",
+      "actor_nullifier = $3",
+    ];
+    const params: unknown[] = [recipient, type, actor];
+    if (postId) {
+      conditions.push(`post_id = $${params.length + 1}`);
+      params.push(postId);
+    }
+    if (conversationId) {
+      conditions.push(`conversation_id = $${params.length + 1}`);
+      params.push(conversationId);
+    }
+    db.query(
+      `INSERT INTO notifications (id, recipient_nullifier, type, actor_nullifier${postId ? ", post_id" : ""}${conversationId ? ", conversation_id" : ""})
+       SELECT gen_random_uuid(), ${params.map((_, i) => `$${i + 1}`).join(", ")}
+       WHERE NOT EXISTS (SELECT 1 FROM notifications WHERE ${conditions.join(" AND ")})`,
+      params,
+    ).catch(() => {});
+  } else {
+    const columns = ["id", "recipient_nullifier", "type", "actor_nullifier"];
+    const params: unknown[] = [recipient, type, actor];
+    if (postId) {
+      columns.push("post_id");
+      params.push(postId);
+    }
+    if (conversationId) {
+      columns.push("conversation_id");
+      params.push(conversationId);
+    }
+    const placeholders = ["gen_random_uuid()", ...params.map((_, i) => `$${i + 1}`)];
+    db.query(
+      `INSERT INTO notifications (${columns.join(", ")}) VALUES (${placeholders.join(", ")})`,
+      params,
+    ).catch(() => {});
+  }
+}
+
+/**
+ * Builds a cursor WHERE clause for pagination.
+ * Mutates queryParams by pushing the cursor value if present.
+ * Returns the SQL fragment (e.g. "AND n.created_at < $3") or empty string.
+ */
+export function buildCursorClause(
+  cursor: string | null,
+  queryParams: unknown[],
+  column: string,
+): string {
+  if (!cursor) return "";
+  queryParams.push(cursor);
+  return `AND ${column} < $${queryParams.length}`;
+}
+
+/**
+ * Builds viewer_liked / viewer_bookmarked LEFT JOINs and SELECT fragment.
+ * Mutates queryParams by pushing the user's nullifier twice (if authenticated).
+ */
+export function viewerFlagsSql(
+  me: string | null,
+  queryParams: unknown[],
+  postAlias: string,
+): { joins: string; select: string } {
+  if (!me) return { joins: "", select: "" };
+
+  queryParams.push(me);
+  const likeParam = queryParams.length;
+  queryParams.push(me);
+  const bookmarkParam = queryParams.length;
+
+  return {
+    joins: `LEFT JOIN likes vl ON vl.post_id = ${postAlias}.id AND vl.nullifier = $${likeParam}
+           LEFT JOIN bookmarks vb ON vb.post_id = ${postAlias}.id AND vb.nullifier = $${bookmarkParam}`,
+    select: ", (vl.nullifier IS NOT NULL) AS viewer_liked, (vb.nullifier IS NOT NULL) AS viewer_bookmarked",
+  };
+}
+
 export function blockFilterSql(
   nullifier: string,
   startParamIndex: number

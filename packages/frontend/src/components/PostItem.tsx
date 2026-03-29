@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Icon } from "@/components/Icon";
 import { ImageDisplay } from "@/components/ImageDisplay";
-import { FileUploader } from "@/components/FileUploader";
+import { ImageLightbox } from "@/components/ImageLightbox";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ShareMenu } from "@/components/ShareMenu";
+import { QuoteDialog } from "@/components/QuoteDialog";
 import type { Post } from "@/lib/types";
 import { formatBalance, formatRelativeTime, weiToEth } from "@/lib/format";
 import { getTierName } from "@/lib/tiers";
@@ -15,6 +16,8 @@ import { useRouter } from "next/navigation";
 import { useLike, useBookmark, useFollow, useBlock } from "@/hooks/useSocial";
 import { useCreateConversation } from "@/hooks/useConversations";
 import { usePost, useDeletePost, useCreatePost } from "@/hooks/usePost";
+import { Linkify } from "@/components/Linkify";
+import { useClickOutside } from "@/hooks/useClickOutside";
 import { useToast } from "@/providers/ToastProvider";
 
 interface PostItemProps {
@@ -46,28 +49,14 @@ export function PostItem({ post }: PostItemProps) {
   const [blockConfirmOpen, setBlockConfirmOpen] = useState(false);
   const [repostMenuOpen, setRepostMenuOpen] = useState(false);
   const [quoteOpen, setQuoteOpen] = useState(false);
-  const [quoteText, setQuoteText] = useState("");
-  const [quoteAttachments, setQuoteAttachments] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const repostMenuRef = useRef<HTMLDivElement>(null);
 
   const isOwn = user?.nullifier === post.author_nullifier;
 
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    if (!menuOpen && !repostMenuOpen) return;
-    function handleClick(e: MouseEvent) {
-      if (menuOpen && menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-      if (repostMenuOpen && repostMenuRef.current && !repostMenuRef.current.contains(e.target as Node)) {
-        setRepostMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [menuOpen, repostMenuOpen]);
+  useClickOutside(menuRef, useCallback(() => setMenuOpen(false), []), menuOpen);
+  useClickOutside(repostMenuRef, useCallback(() => setRepostMenuOpen(false), []), repostMenuOpen);
 
   const handleLike = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -88,25 +77,6 @@ export function PostItem({ post }: PostItemProps) {
     createPost.mutate(
       { repost_of_id: post.id },
       { onSuccess: () => toastSuccess("Reposted") },
-    );
-  };
-
-  const handleQuoteSubmit = () => {
-    if (!quoteText.trim() && quoteAttachments.length === 0) return;
-    createPost.mutate(
-      {
-        body: quoteText || undefined,
-        repost_of_id: post.id,
-        attachments: quoteAttachments.length > 0 ? quoteAttachments : undefined,
-      },
-      {
-        onSuccess: () => {
-          toastSuccess("Quote posted");
-          setQuoteOpen(false);
-          setQuoteText("");
-          setQuoteAttachments([]);
-        },
-      },
     );
   };
 
@@ -169,13 +139,12 @@ export function PostItem({ post }: PostItemProps) {
                 · {formatRelativeTime(post.created_at)}
               </span>
             </div>
-
           </div>
 
           {/* Body */}
           <Link href={`/post/${post.id}`} onClick={(e) => e.stopPropagation()}>
             <p className="font-mono text-sm leading-relaxed text-on-surface font-medium">
-              {post.body}
+              {post.body && <Linkify text={post.body} nested />}
             </p>
           </Link>
 
@@ -203,7 +172,7 @@ export function PostItem({ post }: PostItemProps) {
               </div>
               {originalPost.body && (
                 <p className="text-xs text-on-surface-variant font-mono line-clamp-3">
-                  {originalPost.body}
+                  <Linkify text={originalPost.body} nested />
                 </p>
               )}
               {originalPost.attachments && originalPost.attachments.length > 0 && (
@@ -245,56 +214,12 @@ export function PostItem({ post }: PostItemProps) {
             </div>
           )}
 
-          {/* Lightbox */}
-          {lightboxIndex !== null && post.attachments && post.attachments.length > 0 && (
-            <div
-              className="fixed inset-0 z-[200] bg-black/90 flex items-center justify-center"
-              onClick={() => setLightboxIndex(null)}
-            >
-              <button
-                onClick={() => setLightboxIndex(null)}
-                className="absolute top-4 right-4 text-white/80 hover:text-white z-10"
-              >
-                <Icon name="close" className="text-3xl" />
-              </button>
-
-              {post.attachments.length > 1 && lightboxIndex > 0 && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex - 1); }}
-                  className="absolute left-4 text-white/80 hover:text-white z-10"
-                >
-                  <Icon name="chevron_left" className="text-4xl" />
-                </button>
-              )}
-
-              {post.attachments.length > 1 && lightboxIndex < post.attachments.length - 1 && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex + 1); }}
-                  className="absolute right-4 text-white/80 hover:text-white z-10"
-                >
-                  <Icon name="chevron_right" className="text-4xl" />
-                </button>
-              )}
-
-              <div className="max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-                <ImageDisplay
-                  uploadKey={post.attachments.sort((a, b) => a.position - b.position)[lightboxIndex].upload_key}
-                  className="max-w-[90vw] max-h-[90vh] object-contain"
-                />
-              </div>
-
-              {post.attachments.length > 1 && (
-                <div className="absolute bottom-4 flex gap-2">
-                  {post.attachments.map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-2 h-2 rounded-full ${i === lightboxIndex ? "bg-white" : "bg-white/40"}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <ImageLightbox
+            attachments={post.attachments ?? []}
+            openIndex={lightboxIndex}
+            onClose={() => setLightboxIndex(null)}
+            onNavigate={setLightboxIndex}
+          />
 
           {/* Action bar */}
           <div className="flex justify-between items-center pt-4 mt-1 text-on-surface-variant/50 max-w-md font-mono">
@@ -386,6 +311,7 @@ export function PostItem({ post }: PostItemProps) {
             />
 
             {/* More menu */}
+            {isAuthenticated && (
             <div className="relative" ref={menuRef}>
               <button
                 onClick={(e) => {
@@ -399,7 +325,7 @@ export function PostItem({ post }: PostItemProps) {
               </button>
               {menuOpen && (
                 <div className="absolute right-0 top-full mt-1 z-40 bg-background border border-outline shadow-lg min-w-[180px]">
-                  {isAuthenticated && !isOwn && (
+                  {!isOwn && (
                     <>
                       <button
                         onClick={(e) => {
@@ -459,91 +385,17 @@ export function PostItem({ post }: PostItemProps) {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Quote compose dialog */}
-      {quoteOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-          onClick={() => setQuoteOpen(false)}
-        >
-          <div
-            className="glass-panel border border-outline w-full max-w-lg mx-4 p-6 space-y-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold text-primary uppercase tracking-widest font-mono">
-                Quote Post
-              </h3>
-              <button
-                onClick={() => setQuoteOpen(false)}
-                className="text-on-surface-variant/60 hover:text-primary transition-colors"
-              >
-                <Icon name="close" className="text-lg" />
-              </button>
-            </div>
-            <textarea
-              value={quoteText}
-              onChange={(e) => setQuoteText(e.target.value)}
-              placeholder="Add your comment..."
-              className="w-full bg-background border border-outline focus:border-primary focus:ring-0 text-on-surface p-3 font-mono text-sm resize-none min-h-[80px]"
-              autoFocus
-            />
-            {quoteAttachments.length > 0 && (
-              <div className="flex gap-2">
-                {quoteAttachments.map((key, i) => (
-                  <div key={key} className="relative w-16 h-16 border border-outline">
-                    <ImageDisplay uploadKey={key} className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => setQuoteAttachments((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="absolute top-0 right-0 bg-black/60 text-white text-xs p-0.5"
-                    >
-                      X
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="flex gap-4 text-on-surface-variant">
-              {quoteAttachments.length < 4 && (
-                <FileUploader
-                  onComplete={(key) => setQuoteAttachments((prev) => prev.length < 4 ? [...prev, key] : prev)}
-                  className="inline-block"
-                >
-                  <Icon name="image" className="cursor-pointer hover:text-primary transition-colors" />
-                </FileUploader>
-              )}
-            </div>
-            {/* Quoted post preview */}
-            <div className="border border-outline p-3 space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-primary font-mono">
-                  {formatBalance(post.public_balance)}
-                </span>
-                <span className="text-[10px] text-on-surface-variant/40 font-mono">
-                  · {formatRelativeTime(post.created_at)}
-                </span>
-              </div>
-              <p className="text-xs text-on-surface-variant font-mono line-clamp-3">
-                {post.body}
-              </p>
-            </div>
-            <div className="flex justify-end">
-              <button
-                onClick={handleQuoteSubmit}
-                disabled={(!quoteText.trim() && quoteAttachments.length === 0) || createPost.isPending}
-                className="px-6 py-2 bg-primary/10 border border-primary text-primary font-bold text-xs hover:bg-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-widest font-mono"
-              >
-                {createPost.isPending ? "POSTING..." : "QUOTE"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <QuoteDialog
+        post={post}
+        open={quoteOpen}
+        onClose={() => setQuoteOpen(false)}
+      />
 
-      {/* Delete confirmation dialog */}
       <ConfirmDialog
         open={confirmOpen}
         title="Delete Post"

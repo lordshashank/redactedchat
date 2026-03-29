@@ -1,12 +1,12 @@
 import type { RouteConfig } from "../../server/router.js";
-import { parseQueryParams, parseCursor, cursorResponse } from "../../app/helpers.js";
+import { parseQueryParams, parseCursor, cursorResponse, buildCursorClause } from "../../app/helpers.js";
 
 export const notificationRoutes: RouteConfig[] = [
   {
     method: "POST",
     path: "/notifications/read",
     auth: { strategy: "session" },
-    rateLimit: { windowMs: 60_000, max: 30 },
+    rateLimit: { windowMs: 60_000, max: 60 },
     handler: async (ctx) => {
       const me = ctx.auth.userId;
 
@@ -49,12 +49,7 @@ export const notificationRoutes: RouteConfig[] = [
       const { cursor, limit } = parseCursor(params);
 
       const queryParams: unknown[] = [me, limit + 1];
-      let cursorClause = "";
-
-      if (cursor) {
-        cursorClause = "AND n.created_at < $3";
-        queryParams.push(cursor);
-      }
+      const cursorClause = buildCursorClause(cursor, queryParams, "n.created_at");
 
       const result = await ctx.db.query(
         `SELECT n.*, pr.public_balance AS actor_balance, pr.avatar_key AS actor_avatar

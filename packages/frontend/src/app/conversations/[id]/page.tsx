@@ -7,8 +7,9 @@ import { PageHeader } from "@/components/PageHeader";
 import { Icon } from "@/components/Icon";
 import { FileUploader } from "@/components/FileUploader";
 import { ImageDisplay } from "@/components/ImageDisplay";
+import { Linkify } from "@/components/Linkify";
 import { formatBalance, formatRelativeTime } from "@/lib/format";
-import { useAuth } from "@/hooks/useAuth";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import {
   useMessages,
   useSendMessage,
@@ -23,19 +24,13 @@ export default function ConversationDetailPage({
 }) {
   const { id } = use(params);
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useRequireAuth();
   const messages = useMessages(id);
   const sendMessage = useSendMessage(id);
   const markRead = useMarkConversationRead(id);
   const [inputText, setInputText] = useState("");
   const [attachmentKey, setAttachmentKey] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push("/setup");
-    }
-  }, [authLoading, isAuthenticated, router]);
 
   // Mark conversation as read on mount
   useEffect(() => {
@@ -179,7 +174,7 @@ export default function ConversationDetailPage({
                         : "bg-surface-container border border-outline text-on-surface"
                     }`}
                   >
-                    {msg.body}
+                    {msg.body && <Linkify text={msg.body} />}
                     {msg.attachment_key && (
                       <div className="mt-2 max-w-xs">
                         <ImageDisplay uploadKey={msg.attachment_key} className="w-full rounded" />

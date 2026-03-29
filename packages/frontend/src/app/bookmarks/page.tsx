@@ -1,24 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Icon } from "@/components/Icon";
 import { PostItem } from "@/components/PostItem";
-import { useAuth } from "@/hooks/useAuth";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useBookmarks } from "@/hooks/useBookmarks";
 
 export default function BookmarksPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading } = useRequireAuth();
   const bookmarks = useBookmarks();
-
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push("/setup");
-    }
-  }, [authLoading, isAuthenticated, router]);
 
   const posts =
     bookmarks.data?.pages?.flatMap((p) => p.data) ?? [];

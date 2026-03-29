@@ -178,6 +178,76 @@ button:focus-visible {
   scrollbar-width: none;
 }
 
+/* ---- Mobile Bottom Nav ---- */
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ---- Icon-only Sidebar Tooltip ---- */
+
+.sidebar-tooltip {
+  position: relative;
+}
+
+.sidebar-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--color-surface-container-high);
+  color: var(--color-on-surface);
+  border: 1px solid var(--color-outline);
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 100;
+}
+
+.sidebar-tooltip:hover::after {
+  opacity: 1;
+}
+
+/* Hide tooltips when sidebar is in full mode (lg+) */
+@media (min-width: 1024px) {
+  .sidebar-tooltip::after {
+    display: none;
+  }
+}
+
+/* ---- FAB (Floating Action Button) ---- */
+
+.fab-new-proof {
+  position: fixed;
+  bottom: calc(72px + env(safe-area-inset-bottom, 0px) + 16px);
+  right: 16px;
+  z-index: 60;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary);
+  color: var(--color-background);
+  border: none;
+  transition: transform 0.2s ease;
+}
+
+.fab-new-proof:active {
+  transform: scale(0.92);
+}
+
+@media (min-width: 768px) {
+  .fab-new-proof {
+    display: none;
+  }
+}
+
 /* ---- Material Symbols ---- */
 
 .material-symbols-outlined {

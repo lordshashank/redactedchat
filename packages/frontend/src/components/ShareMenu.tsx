@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Icon } from "@/components/Icon";
 import { useToast } from "@/providers/ToastProvider";
 import { useAuth } from "@/hooks/useAuth";
+import { useClickOutside } from "@/hooks/useClickOutside";
 
 interface ShareMenuProps {
   url: string;
@@ -20,16 +21,7 @@ export function ShareMenu({ url, text = "", className }: ShareMenuProps) {
   const { isAuthenticated } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-        setShareSubOpen(false);
-      }
-    };
-    if (open) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
+  useClickOutside(menuRef, useCallback(() => { setOpen(false); setShareSubOpen(false); }, []), open);
 
   const fullUrl = typeof window !== "undefined" ? `${window.location.origin}${url}` : url;
   const encodedUrl = encodeURIComponent(fullUrl);

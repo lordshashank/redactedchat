@@ -1,8 +1,9 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { use, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
+import { ComposeBox } from "@/components/ComposeBox";
 import { PageHeader } from "@/components/PageHeader";
 import { Icon } from "@/components/Icon";
 import { PostItem } from "@/components/PostItem";
@@ -87,7 +88,6 @@ export default function PostDetailPage({
   const thread = useThread(id);
   const recordView = useRecordView();
   const createPost = useCreatePost();
-  const [replyText, setReplyText] = useState("");
 
   useEffect(() => {
     if (id) {
@@ -95,14 +95,6 @@ export default function PostDetailPage({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
-
-  const handleReply = () => {
-    if (!replyText.trim()) return;
-    createPost.mutate(
-      { body: replyText, parent_id: id },
-      { onSuccess: () => setReplyText("") },
-    );
-  };
 
   return (
     <AppLayout rightSidebar={<PostRightSidebar post={post.data} />}>
@@ -132,33 +124,19 @@ export default function PostDetailPage({
       {/* Reply Compose */}
       {isAuthenticated && post.data && (
         <div className="p-4 border-b border-outline bg-background">
-          <div className="flex gap-3">
-            <div className="w-10 h-10 shrink-0 bg-primary/10 border border-outline flex items-center justify-center overflow-hidden">
-              {user?.avatar_key ? (
-                <ImageDisplay uploadKey={user.avatar_key} className="w-full h-full object-cover" />
-              ) : (
-                <Icon name="person" className="text-on-surface-variant/60 text-sm" />
-              )}
-            </div>
-            <div className="flex-1">
-              <textarea
-                className="w-full bg-transparent border-none focus:ring-0 text-sm placeholder:text-on-surface-variant/30 text-on-surface resize-none h-10 py-2 pl-2 font-mono"
-                placeholder="Post your reply..."
-                rows={1}
-                value={replyText}
-                onChange={(e) => setReplyText(e.target.value)}
-              />
-              <div className="flex justify-end mt-2">
-                <button
-                  onClick={handleReply}
-                  disabled={!replyText.trim() || createPost.isPending}
-                  className="px-4 py-1.5 bg-primary/10 border border-primary text-primary font-bold text-[10px] hover:bg-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-widest"
-                >
-                  {createPost.isPending ? "SENDING..." : "REPLY"}
-                </button>
-              </div>
-            </div>
-          </div>
+          <ComposeBox
+            compact
+            placeholder="Post your reply..."
+            submitLabel="REPLY"
+            avatarKey={user?.avatar_key}
+            onSubmit={async (body, attachments) => {
+              await createPost.mutateAsync({
+                body,
+                parent_id: id,
+                attachments: attachments.length > 0 ? attachments : undefined,
+              });
+            }}
+          />
         </div>
       )}
 

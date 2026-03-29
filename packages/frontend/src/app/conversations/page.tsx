@@ -1,25 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Icon } from "@/components/Icon";
 import { formatBalance, formatRelativeTime } from "@/lib/format";
-import { useAuth } from "@/hooks/useAuth";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import { useConversations } from "@/hooks/useConversations";
 
 export default function ConversationsPage() {
-  const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isLoading: authLoading } = useRequireAuth();
   const conversations = useConversations();
-
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push("/setup");
-    }
-  }, [authLoading, isAuthenticated, router]);
 
   const allConversations =
     conversations.data?.pages?.flatMap((p) => p.data) ?? [];

@@ -1,6 +1,6 @@
 import type { RouteConfig } from "../../server/router.js";
 import type { QueryFn } from "../../db/pool.js";
-import { parseQueryParams, parseCursor, cursorResponse } from "../helpers.js";
+import { parseQueryParams, parseCursor, cursorResponse, buildCursorClause, notify } from "../helpers.js";
 
 export function createConversationRoutes(config: {
   messageMaxLength: number;
@@ -11,13 +11,15 @@ export function createConversationRoutes(config: {
     method: "POST",
     path: "/conversations",
     auth: { strategy: "session" },
-    rateLimit: { windowMs: 60_000, max: 10 },
+    rateLimit: { windowMs: 60_000, max: 20 },
     handler: async (ctx) => {
       const me = ctx.auth.userId;
       const isGroup = ctx.body.is_group === true;
 
       if (isGroup) {
         // --- Group conversation ---
+        // TODO: check blocks for each participant (currently only enforced on 1:1 DMs)
+        // TODO: add leave-group / remove-member endpoints
         const participants = ctx.body.participants as string[] | undefined;
         const name = (ctx.body.name as string | undefined) || null;
 
@@ -62,13 +64,7 @@ export function createConversationRoutes(config: {
 
         // Fire-and-forget: notify each participant about group invite
         for (const participant of participants) {
-          ctx.db
-            .query(
-              `INSERT INTO notifications (id, recipient_nullifier, type, actor_nullifier, conversation_id)
-               VALUES (gen_random_uuid(), $1, 'group_invite', $2, $3)`,
-              [participant, me, conversation.id]
-            )
-            .catch(() => {});
+          notify(ctx.db, { recipient: participant, type: "group_invite", actor: me, conversationId: conversation.id as string });
         }
 
         return { status: 201, json: conversation };
@@ -153,12 +149,7 @@ export function createConversationRoutes(config: {
       const { cursor, limit } = parseCursor(params);
 
       const queryParams: unknown[] = [me, limit + 1];
-      let cursorClause = "";
-
-      if (cursor) {
-        cursorClause = "AND COALESCE(c.last_message_at, c.created_at) < $3";
-        queryParams.push(cursor);
-      }
+      const cursorClause = buildCursorClause(cursor, queryParams, "COALESCE(c.last_message_at, c.created_at)");
 
       const result = await ctx.db.query(
         `SELECT c.id, c.is_group, c.name, c.last_message_at, c.created_at,
@@ -269,12 +260,7 @@ export function createConversationRoutes(config: {
       const { cursor, limit } = parseCursor(params);
 
       const queryParams: unknown[] = [conversationId, limit + 1];
-      let cursorClause = "";
-
-      if (cursor) {
-        cursorClause = "AND m.created_at < $3";
-        queryParams.push(cursor);
-      }
+      const cursorClause = buildCursorClause(cursor, queryParams, "m.created_at");
 
       const result = await ctx.db.query(
         `SELECT m.*, pr.public_balance, pr.avatar_key
@@ -300,7 +286,7 @@ export function createConversationRoutes(config: {
     method: "POST",
     path: "/conversations/:id/messages",
     auth: { strategy: "session" },
-    rateLimit: { windowMs: 60_000, max: 30 },
+    rateLimit: { windowMs: 60_000, max: 60 },
     handler: async (ctx) => {
       const me = ctx.auth.userId;
       const conversationId = ctx.params.id;
@@ -349,15 +335,9 @@ export function createConversationRoutes(config: {
           "SELECT nullifier FROM conversation_members WHERE conversation_id = $1 AND nullifier != $2",
           [conversationId, me]
         )
-        .then((r) => {
-          for (const row of r.rows as Array<{ nullifier: string }>) {
-            ctx.db
-              .query(
-                `INSERT INTO notifications (id, recipient_nullifier, type, actor_nullifier, conversation_id)
-                 VALUES (gen_random_uuid(), $1, 'dm', $2, $3)`,
-                [row.nullifier, me, conversationId]
-              )
-              .catch(() => {});
+        .then(({ rows }) => {
+          for (const row of rows as Array<{ nullifier: string }>) {
+            notify(ctx.db, { recipient: row.nullifier, type: "dm", actor: me, conversationId });
           }
         })
         .catch(() => {});
@@ -374,7 +354,7 @@ export function createConversationRoutes(config: {
     method: "POST",
     path: "/conversations/:id/read",
     auth: { strategy: "session" },
-    rateLimit: { windowMs: 60_000, max: 60 },
+    rateLimit: { windowMs: 60_000, max: 120 },
     handler: async (ctx) => {
       const me = ctx.auth.userId;
       const conversationId = ctx.params.id;

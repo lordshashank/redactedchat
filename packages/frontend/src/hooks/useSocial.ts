@@ -1,5 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import type {
+  LikeToggleResult,
+  BookmarkToggleResult,
+  FollowToggleResult,
+  BlockToggleResult,
+} from "@/lib/types";
 import { useToast } from "@/providers/ToastProvider";
 
 export function useLike() {
@@ -8,7 +14,7 @@ export function useLike() {
 
   return useMutation({
     mutationFn: (postId: string) =>
-      apiFetch<{ liked: boolean; like_count: number }>(
+      apiFetch<LikeToggleResult>(
         `/posts/${postId}/like`,
         { method: "POST" },
       ),
@@ -55,7 +61,7 @@ export function useBookmark() {
 
   return useMutation({
     mutationFn: (postId: string) =>
-      apiFetch<{ bookmarked: boolean }>(
+      apiFetch<BookmarkToggleResult>(
         `/posts/${postId}/bookmark`,
         { method: "POST" },
       ),
@@ -98,7 +104,7 @@ export function useFollow() {
 
   return useMutation({
     mutationFn: (nullifier: string) =>
-      apiFetch<{ following: boolean }>(
+      apiFetch<FollowToggleResult>(
         `/profiles/${nullifier}/follow`,
         { method: "POST" },
       ),
@@ -118,7 +124,7 @@ export function useBlock() {
 
   return useMutation({
     mutationFn: (nullifier: string) =>
-      apiFetch<{ blocked: boolean }>(
+      apiFetch<BlockToggleResult>(
         `/profiles/${nullifier}/block`,
         { method: "POST" },
       ),

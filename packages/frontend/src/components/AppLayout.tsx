@@ -1,6 +1,7 @@
 "use client";
 
 import { Sidebar } from "./Sidebar";
+import { MobileNav } from "./MobileNav";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -9,18 +10,19 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, rightSidebar }: AppLayoutProps) {
   return (
-    <div className="max-w-[1280px] mx-auto flex min-h-screen">
+    <div className="xl:max-w-[1280px] mx-auto flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 flex">
-        <div className="w-[600px] shrink-0 border-r border-outline min-h-screen bg-background">
+      <main className="flex-1 flex min-w-0">
+        <div className="w-full xl:w-[600px] xl:shrink-0 border-r border-outline min-h-screen bg-background pb-[72px] md:pb-0">
           {children}
         </div>
         {rightSidebar && (
-          <aside className="w-[350px] sticky top-0 h-screen p-6 overflow-y-auto no-scrollbar space-y-6 bg-background border-l border-outline">
+          <aside className="hidden xl:block w-[350px] sticky top-0 h-screen p-6 overflow-y-auto no-scrollbar space-y-6 bg-background border-l border-outline">
             {rightSidebar}
           </aside>
         )}
       </main>
+      <MobileNav />
     </div>
   );
 }

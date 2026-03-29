@@ -115,7 +115,7 @@ export function createHttpServer(options: HttpServerOptions): http.Server {
       const ip = getClientIp(req);
       const limitConfig = route.rateLimit ?? {
         windowMs: 60_000,
-        max: 100,
+        max: 200,
       };
       const limitResult = rateLimiter.check(`${ip}:${route.path}`, limitConfig);
 

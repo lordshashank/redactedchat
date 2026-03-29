@@ -98,7 +98,7 @@ export function createErrorpingRoutes(
       method: "POST",
       path: "/errorping",
       auth: "public",
-      rateLimit: { windowMs: 60_000, max: 60 },
+      rateLimit: { windowMs: 60_000, max: 120 },
       handler: async (ctx) => {
         const event = ctx.body;
 

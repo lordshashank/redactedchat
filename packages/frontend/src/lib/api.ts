@@ -1,3 +1,5 @@
+import { captureError, Severity } from "errorping";
+
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
 export class ApiError extends Error {
@@ -60,7 +62,16 @@ export async function apiFetch<T>(
         ? (body as { error: string }).error
         : `API error: ${res.status}`;
 
-    throw new ApiError(res.status, body, message);
+    const err = new ApiError(res.status, body, message);
+    captureError(err, {
+      severity: res.status >= 500 ? Severity.ERROR : Severity.WARNING,
+      context: {
+        method: fetchOptions.method || "GET",
+        url: path,
+        statusCode: res.status,
+      },
+    });
+    throw err;
   }
 
   if (res.status === 204) return undefined as T;

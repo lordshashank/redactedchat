@@ -1,11 +1,11 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
+import { ComposeBox } from "@/components/ComposeBox";
 import { Icon } from "@/components/Icon";
-import { FileUploader } from "@/components/FileUploader";
 import { ImageDisplay } from "@/components/ImageDisplay";
 import { PostItem } from "@/components/PostItem";
 import type { Post as BackendPost } from "@/lib/types";
@@ -146,9 +146,6 @@ function HomeInner() {
   const setFeedType = (type: string) => {
     router.replace(type === "trending" ? "/" : `/?feed=${type}`, { scroll: false });
   };
-  const [composeText, setComposeText] = useState("");
-  const [attachmentKeys, setAttachmentKeys] = useState<string[]>([]);
-  const composeRef = useRef<HTMLTextAreaElement>(null);
   const { user, isAuthenticated } = useAuth();
   const createPost = useCreatePost();
 
@@ -175,29 +172,6 @@ function HomeInner() {
   const isFetchingNextPage = isTrending
     ? trending.isFetchingNextPage
     : feed.isFetchingNextPage;
-
-  const handleBroadcast = () => {
-    if (!composeText.trim() && attachmentKeys.length === 0) return;
-    createPost.mutate(
-      {
-        body: composeText,
-        attachments: attachmentKeys.length > 0 ? attachmentKeys : undefined,
-      },
-      {
-        onSuccess: () => {
-          setComposeText("");
-          setAttachmentKeys([]);
-        },
-      },
-    );
-  };
-
-  useEffect(() => {
-    const el = composeRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [composeText]);
 
   const tabs: { label: string; value: "latest" | "following" | "trending" }[] =
     [
@@ -229,86 +203,29 @@ function HomeInner() {
 
       {/* Compose Box */}
       <div className="p-6 border-b border-outline bg-background">
-        <div className="flex gap-4">
-          <div className="w-12 h-12 shrink-0 bg-primary/10 border border-outline flex items-center justify-center overflow-hidden">
-            {user?.avatar_key ? (
-              <ImageDisplay uploadKey={user.avatar_key} className="w-full h-full object-cover" />
-            ) : (
-              <Icon name="person" className="text-on-surface-variant/60" />
-            )}
+        {isAuthenticated ? (
+          <ComposeBox
+            avatarKey={user?.avatar_key}
+            onSubmit={async (body, attachments) => {
+              await createPost.mutateAsync({
+                body,
+                attachments: attachments.length > 0 ? attachments : undefined,
+              });
+            }}
+          />
+        ) : (
+          <div className="flex items-center h-12 py-2 ml-16">
+            <p className="text-sm font-mono text-on-surface-variant/60">
+              <Link
+                href="/profile"
+                className="text-primary hover:text-primary-glow transition-colors"
+              >
+                Verify your balance
+              </Link>{" "}
+              to post
+            </p>
           </div>
-          <div className="flex-1">
-            {isAuthenticated ? (
-              <>
-                <textarea
-                  ref={composeRef}
-                  className="w-full bg-transparent border-none focus:ring-0 text-lg placeholder:text-on-surface-variant/30 text-on-surface resize-none overflow-hidden min-h-12 py-2 pl-2 font-mono"
-                  placeholder="Input cryptographic stream..."
-                  rows={1}
-                  value={composeText}
-                  onChange={(e) => setComposeText(e.target.value)}
-                />
-                {/* Attachment previews */}
-                {attachmentKeys.length > 0 && (
-                  <div className="flex gap-2 mt-2">
-                    {attachmentKeys.map((key, i) => (
-                      <div key={key} className="relative w-20 h-20 border border-outline">
-                        <ImageDisplay uploadKey={key} className="w-full h-full object-cover" />
-                        <button
-                          onClick={() => setAttachmentKeys((prev) => prev.filter((_, idx) => idx !== i))}
-                          className="absolute top-0 right-0 bg-black/60 text-white text-xs p-0.5"
-                        >
-                          X
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div className="flex items-center justify-between mt-4">
-                  <div className="flex gap-4 text-on-surface-variant">
-                    {attachmentKeys.length < 4 && (
-                      <FileUploader
-                        onComplete={(key) => setAttachmentKeys((prev) => prev.length < 4 ? [...prev, key] : prev)}
-                        className="inline-block"
-                      >
-                        <Icon
-                          name="image"
-                          className="cursor-pointer hover:text-primary transition-colors"
-                        />
-                      </FileUploader>
-                    )}
-                    <Icon
-                      name="poll"
-                      className="opacity-30 cursor-not-allowed"
-                      title="Polls coming soon"
-                    />
-                  </div>
-                  <button
-                    onClick={handleBroadcast}
-                    disabled={
-                      (!composeText.trim() && attachmentKeys.length === 0) || createPost.isPending
-                    }
-                    className="px-6 py-2 bg-primary/10 border border-primary text-primary font-bold text-xs hover:bg-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    {createPost.isPending ? "SENDING..." : "BROADCAST"}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <div className="flex items-center h-12 py-2">
-                <p className="text-sm font-mono text-on-surface-variant/60">
-                  <Link
-                    href="/profile"
-                    className="text-primary hover:text-primary-glow transition-colors"
-                  >
-                    Verify your balance
-                  </Link>{" "}
-                  to post
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Feed Posts */}

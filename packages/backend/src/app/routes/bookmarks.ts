@@ -1,13 +1,13 @@
 import type { RouteConfig } from "../../server/router.js";
 import type { QueryFn } from "../../db/pool.js";
-import { parseQueryParams, parseCursor, cursorResponse } from "../../app/helpers.js";
+import { parseQueryParams, parseCursor, cursorResponse, buildCursorClause } from "../../app/helpers.js";
 
 export const bookmarkRoutes: RouteConfig[] = [
   {
     method: "POST",
     path: "/posts/:id/bookmark",
     auth: { strategy: "session" },
-    rateLimit: { windowMs: 60_000, max: 60 },
+    rateLimit: { windowMs: 60_000, max: 120 },
     handler: async (ctx) => {
       const postId = ctx.params.id;
       const nullifier = ctx.auth.userId;
@@ -49,12 +49,7 @@ export const bookmarkRoutes: RouteConfig[] = [
       const { cursor, limit } = parseCursor(params);
 
       const queryParams: unknown[] = [nullifier, limit + 1];
-      let cursorClause = "";
-
-      if (cursor) {
-        cursorClause = "AND b.created_at < $3";
-        queryParams.push(cursor);
-      }
+      const cursorClause = buildCursorClause(cursor, queryParams, "b.created_at");
 
       const result = await ctx.db.query(
         `SELECT b.created_at AS bookmark_created_at, p.*, pr.public_balance, pr.avatar_key,

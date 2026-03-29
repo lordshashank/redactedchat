@@ -80,7 +80,7 @@ export function createUploadRoutes(config: UploadRoutesConfig): RouteConfig[] {
       method: "POST",
       path: "/uploads",
       auth,
-      rateLimit: { windowMs: 60_000, max: 10 },
+      rateLimit: { windowMs: 60_000, max: 20 },
       handler: async (ctx) => {
         const { contentType, filename, fileSize } = ctx.body as {
           contentType?: string;

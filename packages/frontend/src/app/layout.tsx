@@ -4,6 +4,7 @@ import { Web3Provider } from "@/providers/Web3Provider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { ToastProvider } from "@/providers/ToastProvider";
+import { ErrorPingWrapper } from "@/providers/ErrorPingProvider";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -64,13 +65,15 @@ export default function RootLayout({
       <body className={`${spaceGrotesk.variable} font-sans antialiased`}>
         <div className="grain-overlay" />
         <div className="scanline-overlay" />
-        <ThemeProvider>
-          <Web3Provider>
-            <AuthProvider>
-              <ToastProvider>{children}</ToastProvider>
-            </AuthProvider>
-          </Web3Provider>
-        </ThemeProvider>
+        <ErrorPingWrapper>
+          <ThemeProvider>
+            <Web3Provider>
+              <AuthProvider>
+                <ToastProvider>{children}</ToastProvider>
+              </AuthProvider>
+            </Web3Provider>
+          </ThemeProvider>
+        </ErrorPingWrapper>
       </body>
     </html>
   );

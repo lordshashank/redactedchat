@@ -6,6 +6,8 @@ import {
   cursorResponse,
   blockFilterSql,
   attachAttachmentsToRows,
+  viewerFlagsSql,
+  notify,
 } from "../helpers.js";
 
 export function createPostRoutes(config: {
@@ -18,7 +20,7 @@ export function createPostRoutes(config: {
       method: "POST",
       path: "/posts",
       auth: { strategy: "session" },
-      rateLimit: { windowMs: 60_000, max: 20 },
+      rateLimit: { windowMs: 60_000, max: 40 },
       handler: async (ctx) => {
         const { body, attachments, parent_id, repost_of_id, poll } = ctx.body as {
           body?: string;
@@ -147,36 +149,18 @@ export function createPostRoutes(config: {
         });
 
         // Fire-and-forget notifications
+        const postId = (post as Record<string, unknown>).id as string;
         if (parent_id) {
-          ctx.db
-            .query("SELECT author_nullifier FROM posts WHERE id = $1", [parent_id])
-            .then((r) => {
-              const parentAuthor = (r.rows[0] as { author_nullifier: string } | undefined)
-                ?.author_nullifier;
-              if (parentAuthor && parentAuthor !== author) {
-                return ctx.db.query(
-                  `INSERT INTO notifications (id, recipient_nullifier, type, actor_nullifier, post_id)
-                   VALUES (gen_random_uuid(), $1, 'reply', $2, $3)`,
-                  [parentAuthor, author, (post as Record<string, unknown>).id]
-                );
-              }
+          ctx.db.query("SELECT author_nullifier FROM posts WHERE id = $1", [parent_id])
+            .then(({ rows }) => {
+              if (rows[0]) notify(ctx.db, { recipient: rows[0].author_nullifier as string, type: "reply", actor: author, postId });
             })
             .catch(() => {});
         }
-
         if (repost_of_id) {
-          ctx.db
-            .query("SELECT author_nullifier FROM posts WHERE id = $1", [repost_of_id])
-            .then((r) => {
-              const originalAuthor = (r.rows[0] as { author_nullifier: string } | undefined)
-                ?.author_nullifier;
-              if (originalAuthor && originalAuthor !== author) {
-                return ctx.db.query(
-                  `INSERT INTO notifications (id, recipient_nullifier, type, actor_nullifier, post_id)
-                   VALUES (gen_random_uuid(), $1, 'repost', $2, $3)`,
-                  [originalAuthor, author, (post as Record<string, unknown>).id]
-                );
-              }
+          ctx.db.query("SELECT author_nullifier FROM posts WHERE id = $1", [repost_of_id])
+            .then(({ rows }) => {
+              if (rows[0]) notify(ctx.db, { recipient: rows[0].author_nullifier as string, type: "repost", actor: author, postId });
             })
             .catch(() => {});
         }
@@ -257,19 +241,10 @@ export function createPostRoutes(config: {
         }
 
         // Viewer flags (liked / bookmarked)
-        let viewerSelect = "";
-        if (me) {
-          joins.push(
-            `LEFT JOIN likes l2 ON l2.post_id = p.id AND l2.nullifier = $${paramIdx++}`
-          );
-          queryParams.push(me);
-          joins.push(
-            `LEFT JOIN bookmarks b2 ON b2.post_id = p.id AND b2.nullifier = $${paramIdx++}`
-          );
-          queryParams.push(me);
-          viewerSelect =
-            ", (l2.nullifier IS NOT NULL) AS viewer_liked, (b2.nullifier IS NOT NULL) AS viewer_bookmarked";
-        }
+        const vf = viewerFlagsSql(me, queryParams, "p");
+        if (vf.joins) joins.push(vf.joins);
+        const viewerSelect = vf.select;
+        paramIdx = queryParams.length + 1;
 
         // --- Assemble SQL ---
         const whereClause =
@@ -308,15 +283,7 @@ export function createPostRoutes(config: {
         const me = ctx.auth.userId || null;
 
         const queryParams: unknown[] = [postId];
-        let viewerJoins = "";
-        let viewerSelect = "";
-
-        if (me) {
-          queryParams.push(me, me);
-          viewerJoins = `LEFT JOIN likes vl ON vl.post_id = p.id AND vl.nullifier = $2
-           LEFT JOIN bookmarks vb ON vb.post_id = p.id AND vb.nullifier = $3`;
-          viewerSelect = ", (vl.nullifier IS NOT NULL) AS viewer_liked, (vb.nullifier IS NOT NULL) AS viewer_bookmarked";
-        }
+        const { joins: viewerJoins, select: viewerSelect } = viewerFlagsSql(me, queryParams, "p");
 
         const postResult = await ctx.db.query(
           `SELECT p.*, pr.public_balance, pr.avatar_key${viewerSelect}
@@ -392,15 +359,7 @@ export function createPostRoutes(config: {
         const me = ctx.auth.userId || null;
 
         const queryParams: unknown[] = [postId];
-        let viewerJoins = "";
-        let viewerSelect = "";
-
-        if (me) {
-          queryParams.push(me, me);
-          viewerJoins = `LEFT JOIN likes vl ON vl.post_id = th.id AND vl.nullifier = $2
-           LEFT JOIN bookmarks vb ON vb.post_id = th.id AND vb.nullifier = $3`;
-          viewerSelect = ", (vl.nullifier IS NOT NULL) AS viewer_liked, (vb.nullifier IS NOT NULL) AS viewer_bookmarked";
-        }
+        const { joins: viewerJoins, select: viewerSelect } = viewerFlagsSql(me, queryParams, "th");
 
         const result = await ctx.db.query(
           `WITH RECURSIVE thread AS (
@@ -424,6 +383,8 @@ export function createPostRoutes(config: {
           return { status: 404, json: { error: "Post not found" } };
         }
 
+        await attachAttachmentsToRows(ctx.db, result.rows);
+
         return { status: 200, json: result.rows };
       },
     },
@@ -433,7 +394,7 @@ export function createPostRoutes(config: {
       method: "POST",
       path: "/posts/:id/view",
       auth: { strategy: "session", optional: true },
-      rateLimit: { windowMs: 60_000, max: 120 },
+      rateLimit: { windowMs: 60_000, max: 200 },
       handler: async (ctx) => {
         const postId = ctx.params.id;
         const viewerNullifier = ctx.auth.userId;
@@ -467,7 +428,7 @@ export function createPostRoutes(config: {
       method: "DELETE",
       path: "/posts/:id",
       auth: { strategy: "session" },
-      rateLimit: { windowMs: 60_000, max: 20 },
+      rateLimit: { windowMs: 60_000, max: 40 },
       handler: async (ctx) => {
         const postId = ctx.params.id;
 

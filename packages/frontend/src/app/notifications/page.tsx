@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AppLayout } from "@/components/AppLayout";
 import { PageHeader } from "@/components/PageHeader";
 import { Icon } from "@/components/Icon";
 import { formatBalance, formatRelativeTime } from "@/lib/format";
-import { useAuth } from "@/hooks/useAuth";
+import { useRequireAuth } from "@/hooks/useRequireAuth";
 import {
   useNotifications,
   useMarkAllRead,
@@ -69,16 +68,9 @@ function getNotificationLink(n: Notification): string {
 }
 
 export default function NotificationsPage() {
-  const router = useRouter();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, isLoading: authLoading } = useRequireAuth();
   const notifications = useNotifications();
   const markAllRead = useMarkAllRead();
-
-  useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      router.push("/setup");
-    }
-  }, [authLoading, isAuthenticated, router]);
 
   const allNotifications =
     notifications.data?.pages?.flatMap((p) => p.data) ?? [];

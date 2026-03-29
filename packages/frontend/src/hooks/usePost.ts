@@ -4,7 +4,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
-import type { Post, ThreadPost } from "@/lib/types";
+import type { Post, ThreadPost, CreatePostRequest } from "@/lib/types";
 import { useToast } from "@/providers/ToastProvider";
 
 export function usePost(id: string | null) {
@@ -28,15 +28,7 @@ export function useCreatePost() {
   const { toastError } = useToast();
 
   return useMutation({
-    mutationFn: (
-      data: {
-        body?: string;
-        parent_id?: string;
-        repost_of_id?: string;
-        poll?: { options: string[]; expires_in_hours: number };
-        attachments?: string[];
-      },
-    ) =>
+    mutationFn: (data: CreatePostRequest) =>
       apiFetch<Post>("/posts", {
         method: "POST",
         body: JSON.stringify(data),

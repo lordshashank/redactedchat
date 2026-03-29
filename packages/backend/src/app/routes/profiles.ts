@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import type { RouteConfig } from "../../server/router.js";
-import { parseQueryParams, parseCursor, cursorResponse } from "../helpers.js";
+import { parseQueryParams, parseCursor, cursorResponse, buildCursorClause } from "../helpers.js";
 
 const VALID_GENDERS = ["male", "female", "other"] as const;
 
@@ -168,11 +168,7 @@ export function createProfileRoutes(config: {
         const { cursor, limit } = parseCursor(params);
 
         const queryParams: unknown[] = [ctx.params.nullifier];
-        let cursorClause = "";
-        if (cursor) {
-          cursorClause = " AND l.created_at < $2";
-          queryParams.push(cursor);
-        }
+        const cursorClause = buildCursorClause(cursor, queryParams, "l.created_at");
 
         const limitIdx = queryParams.length + 1;
         queryParams.push(limit + 1);
@@ -203,7 +199,7 @@ export function createProfileRoutes(config: {
       method: "PATCH",
       path: "/profiles",
       auth: { strategy: "session" },
-      rateLimit: { windowMs: 60_000, max: 10 },
+      rateLimit: { windowMs: 60_000, max: 30 },
       handler: async (ctx) => {
         const { bio, gender, age, avatar_key, banner_key } = ctx.body as {
           bio?: string;
@@ -343,11 +339,7 @@ export function createProfileRoutes(config: {
         const { cursor, limit } = parseCursor(params);
 
         const queryParams: unknown[] = [ctx.params.nullifier];
-        let cursorClause = "";
-        if (cursor) {
-          cursorClause = " AND bh.created_at < $2";
-          queryParams.push(cursor);
-        }
+        const cursorClause = buildCursorClause(cursor, queryParams, "bh.created_at");
 
         const limitIdx = queryParams.length + 1;
         queryParams.push(limit + 1);

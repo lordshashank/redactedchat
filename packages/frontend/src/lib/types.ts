@@ -2,6 +2,16 @@ export type Gender = "male" | "female" | "other";
 
 export type FeedType = "latest" | "following" | "trending" | "replies" | "media";
 
+export type NotificationType =
+  | "like"
+  | "reply"
+  | "repost"
+  | "follow"
+  | "poll_ended"
+  | "mention"
+  | "dm"
+  | "group_invite";
+
 export interface Profile {
   nullifier: string;
   bio: string | null;
@@ -71,15 +81,7 @@ export interface ThreadPost extends Post {
 export interface Notification {
   id: string;
   recipient_nullifier: string;
-  type:
-    | "like"
-    | "reply"
-    | "repost"
-    | "follow"
-    | "poll_ended"
-    | "mention"
-    | "dm"
-    | "group_invite";
+  type: NotificationType;
   actor_nullifier: string;
   post_id: string | null;
   conversation_id: string | null;
@@ -145,4 +147,54 @@ export type LeaderboardProfile = Omit<Profile, "updated_at">;
 export interface UserRank {
   rank: number;
   total_users: number;
+}
+
+// ── Toggle response types ───────────────────────────────────────
+
+export interface LikeToggleResult {
+  liked: boolean;
+  like_count: number;
+}
+
+export interface FollowToggleResult {
+  following: boolean;
+  follower_count: number;
+}
+
+export interface BookmarkToggleResult {
+  bookmarked: boolean;
+}
+
+export interface BlockToggleResult {
+  blocked: boolean;
+}
+
+export interface UploadInitResult {
+  key: string;
+  uploadUrl: string;
+}
+
+// ── Request body types ──────────────────────────────────────────
+
+export interface CreatePostRequest {
+  body?: string;
+  parent_id?: string;
+  repost_of_id?: string;
+  attachments?: string[];
+  poll?: {
+    options: string[];
+    expires_in_hours: number;
+  };
+}
+
+export interface CreateConversationRequest {
+  participant?: string;
+  participants?: string[];
+  is_group?: boolean;
+  name?: string;
+}
+
+export interface SendMessageRequest {
+  body?: string;
+  attachment_key?: string;
 }

@@ -26,14 +26,16 @@ export function Sidebar() {
   const { data: unreadConversations } = useUnreadConversationsCount();
 
   return (
-    <aside className="w-[280px] h-screen sticky top-0 border-r border-outline flex flex-col py-8 px-6 bg-background z-50 shrink-0">
-      <Link href="/" className="flex items-center gap-2 mb-10">
+    <aside className="hidden md:flex md:w-[72px] lg:w-[280px] h-screen sticky top-0 border-r border-outline flex-col py-8 md:px-2 lg:px-6 md:items-center lg:items-stretch bg-background z-50 shrink-0">
+      {/* Logo */}
+      <Link href="/" className="flex items-center gap-2 mb-10 md:justify-center lg:justify-start">
         <Icon name="terminal" filled className="text-primary text-3xl" />
-        <span className="text-2xl font-bold tracking-tighter text-primary matrix-glow">
+        <span className="hidden lg:inline text-2xl font-bold tracking-tighter text-primary matrix-glow">
           GhostBalance
         </span>
       </Link>
 
+      {/* Navigation */}
       <nav className="flex-1 space-y-1">
         {NAV_ITEMS.map((item) => {
           const isActive = item.href === "/"
@@ -47,32 +49,43 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={
+              data-tooltip={item.label}
+              className={`relative sidebar-tooltip ${
                 isActive
-                  ? "flex items-center gap-4 py-3 text-primary font-bold border-r-2 border-primary pr-4 transition-all"
-                  : "flex items-center gap-4 py-3 text-on-surface-variant hover:text-primary hover:bg-primary/5 transition-all duration-300"
-              }
+                  ? "flex items-center gap-4 py-3 text-primary font-bold lg:border-r-2 lg:border-primary lg:pr-4 md:justify-center lg:justify-start md:bg-primary/10 lg:bg-transparent transition-all"
+                  : "flex items-center gap-4 py-3 text-on-surface-variant hover:text-primary hover:bg-primary/5 md:justify-center lg:justify-start transition-all duration-300"
+              }`}
             >
               <Icon name={item.icon} filled={isActive} />
-              <span className="font-medium">{item.label}</span>
+              <span className="hidden lg:inline font-medium">{item.label}</span>
+
+              {/* Full badge — visible lg+ */}
               {isNotifications && unread && unread.count > 0 && (
-                <span className="ml-auto bg-primary text-black text-[10px] font-bold px-1.5 py-0.5 min-w-[20px] text-center">
+                <span className="hidden lg:inline ml-auto bg-primary text-black text-[10px] font-bold px-1.5 py-0.5 min-w-[20px] text-center">
                   {unread.count}
                 </span>
               )}
               {isMessages && unreadConversations && unreadConversations.count > 0 && (
-                <span className="ml-auto bg-primary text-black text-[10px] font-bold px-1.5 py-0.5 min-w-[20px] text-center">
+                <span className="hidden lg:inline ml-auto bg-primary text-black text-[10px] font-bold px-1.5 py-0.5 min-w-[20px] text-center">
                   {unreadConversations.count}
                 </span>
+              )}
+
+              {/* Dot badge — visible md to lg (icon-only mode) */}
+              {isNotifications && unread && unread.count > 0 && (
+                <span className="hidden md:block lg:hidden absolute top-2 right-2 w-2.5 h-2.5 bg-primary rounded-full" />
+              )}
+              {isMessages && unreadConversations && unreadConversations.count > 0 && (
+                <span className="hidden md:block lg:hidden absolute top-2 right-2 w-2.5 h-2.5 bg-primary rounded-full" />
               )}
             </Link>
           );
         })}
       </nav>
 
-      {/* User info */}
+      {/* User info — hidden in icon-only mode */}
       {isAuthenticated && user && (
-        <div className="px-6 py-4 border-t border-outline">
+        <div className="hidden lg:block px-6 py-4 border-t border-outline">
           <p className="text-sm font-bold text-primary matrix-glow">
             {formatBalance(user.public_balance)}
           </p>
@@ -82,13 +95,15 @@ export function Sidebar() {
         </div>
       )}
 
+      {/* New Proof CTA */}
       <div className="mt-auto pt-6">
         <Link
           href="/setup"
-          className="w-full bg-primary/10 border border-primary text-primary font-bold py-3 px-4 flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-primary/20"
+          data-tooltip="New Profile"
+          className="sidebar-tooltip w-full bg-primary/10 border border-primary text-primary font-bold py-3 px-4 flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-primary/20"
         >
-          <Icon name="add_circle" className="text-sm" />
-          <span>New Proof</span>
+          <Icon name="add_circle" className="text-sm md:text-xl lg:text-sm" />
+          <span className="hidden lg:inline">New Profile</span>
         </Link>
       </div>
     </aside>

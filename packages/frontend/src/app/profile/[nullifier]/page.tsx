@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect, useRef } from "react";
+import { use, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { AppLayout } from "@/components/AppLayout";
@@ -18,6 +18,7 @@ import { useCreateConversation } from "@/hooks/useConversations";
 import { useToast } from "@/providers/ToastProvider";
 import { apiFetch } from "@/lib/api";
 import { formatBalance, weiToEth } from "@/lib/format";
+import { useClickOutside } from "@/hooks/useClickOutside";
 import { getTierName } from "@/lib/tiers";
 import type { Post, CursorPage, Gender } from "@/lib/types";
 
@@ -356,15 +357,7 @@ export default function ProfilePage({
   const isOwnProfile = user?.nullifier === nullifier;
 
   // Close menu on outside click
-  useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    if (menuOpen) document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [menuOpen]);
+  useClickOutside(menuRef, useCallback(() => setMenuOpen(false), []), menuOpen);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(`${window.location.origin}/profile/${nullifier}`);

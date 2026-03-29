@@ -12,7 +12,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, showBack, onBack, rightContent }: PageHeaderProps) {
   return (
-    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-outline px-6 h-16 flex items-center justify-between">
+    <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-md border-b border-outline px-4 md:px-6 h-14 md:h-16 flex items-center justify-between">
       <div className="flex items-center gap-4">
         {showBack && (
           <button onClick={onBack} className="text-primary cursor-pointer">

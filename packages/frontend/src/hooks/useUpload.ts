@@ -1,10 +1,6 @@
 import { useState, useCallback } from "react";
 import { apiFetch } from "@/lib/api";
-
-interface UploadInitResponse {
-  key: string;
-  uploadUrl: string;
-}
+import type { UploadInitResult } from "@/lib/types";
 
 export function useUpload() {
   const [isUploading, setIsUploading] = useState(false);
@@ -18,7 +14,7 @@ export function useUpload() {
 
     try {
       // Step 1: Request upload URL
-      const { key, uploadUrl } = await apiFetch<UploadInitResponse>(
+      const { key, uploadUrl } = await apiFetch<UploadInitResult>(
         "/uploads",
         {
           method: "POST",

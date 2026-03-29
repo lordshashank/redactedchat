@@ -1,13 +1,13 @@
 import type { RouteConfig } from "../../server/router.js";
 import type { QueryFn } from "../../db/pool.js";
-import { parseQueryParams, parseCursor, cursorResponse } from "../../app/helpers.js";
+import { parseQueryParams, parseCursor, cursorResponse, buildCursorClause, notify } from "../../app/helpers.js";
 
 export const followRoutes: RouteConfig[] = [
   {
     method: "POST",
     path: "/profiles/:nullifier/follow",
     auth: { strategy: "session" },
-    rateLimit: { windowMs: 60_000, max: 30 },
+    rateLimit: { windowMs: 60_000, max: 60 },
     handler: async (ctx) => {
       const targetNullifier = ctx.params.nullifier;
       const myNullifier = ctx.auth.userId;
@@ -84,18 +84,9 @@ export const followRoutes: RouteConfig[] = [
 
       const { following, follower_count } = txResult;
 
-      // Fire-and-forget notification on follow (not unfollow) — outside transaction
-      // Skip if a follow notification from this actor already exists
+      // Fire-and-forget notification on follow (not unfollow)
       if (following) {
-        ctx.db.query(
-          `INSERT INTO notifications (recipient_nullifier, type, actor_nullifier)
-           SELECT $1, $2, $3
-           WHERE NOT EXISTS (
-             SELECT 1 FROM notifications
-             WHERE recipient_nullifier = $1 AND type = $2 AND actor_nullifier = $3
-           )`,
-          [targetNullifier, "follow", myNullifier]
-        ).catch(() => {});
+        notify(ctx.db, { recipient: targetNullifier, type: "follow", actor: myNullifier, dedup: true });
       }
 
       return {
@@ -114,12 +105,7 @@ export const followRoutes: RouteConfig[] = [
       const { cursor, limit } = parseCursor(params);
 
       const queryParams: unknown[] = [targetNullifier, limit + 1];
-      let cursorClause = "";
-
-      if (cursor) {
-        cursorClause = "AND f.created_at < $3";
-        queryParams.push(cursor);
-      }
+      const cursorClause = buildCursorClause(cursor, queryParams, "f.created_at");
 
       const result = await ctx.db.query(
         `SELECT f.follower_nullifier, f.created_at, pr.public_balance, pr.avatar_key
@@ -147,12 +133,7 @@ export const followRoutes: RouteConfig[] = [
       const { cursor, limit } = parseCursor(params);
 
       const queryParams: unknown[] = [targetNullifier, limit + 1];
-      let cursorClause = "";
-
-      if (cursor) {
-        cursorClause = "AND f.created_at < $3";
-        queryParams.push(cursor);
-      }
+      const cursorClause = buildCursorClause(cursor, queryParams, "f.created_at");
 
       const result = await ctx.db.query(
         `SELECT f.following_nullifier, f.created_at, pr.public_balance, pr.avatar_key

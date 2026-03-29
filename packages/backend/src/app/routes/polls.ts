@@ -5,7 +5,7 @@ export const pollRoutes: RouteConfig[] = [
     method: "POST",
     path: "/polls/:id/vote",
     auth: { strategy: "session" },
-    rateLimit: { windowMs: 60_000, max: 10 },
+    rateLimit: { windowMs: 60_000, max: 20 },
     handler: async (ctx) => {
       const pollId = ctx.params.id;
       const nullifier = ctx.auth.userId;

@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Profile } from "@/lib/types";
-import { loadProofBundle, clearProofBundle } from "@/lib/proofStore";
+import { loadProofBundle } from "@/lib/proofStore";
 
 const API_BASE = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:3001";
 
@@ -110,8 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (!verifyResult.valid) {
-        // Server explicitly rejected proofs — clear them
-        clearProofBundle();
+        // Server rejected proofs — keep them locally; a fresh proof will overwrite
         if (!cancelled) {
           setUser(null);
           setIsLoading(false);

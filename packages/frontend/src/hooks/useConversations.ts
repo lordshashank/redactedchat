@@ -5,7 +5,13 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
-import type { Conversation, Message, CursorPage } from "@/lib/types";
+import type {
+  Conversation,
+  Message,
+  CursorPage,
+  SendMessageRequest,
+  CreateConversationRequest,
+} from "@/lib/types";
 import { useToast } from "@/providers/ToastProvider";
 import { useAuth } from "@/providers/AuthProvider";
 
@@ -60,7 +66,7 @@ export function useSendMessage(conversationId: string) {
   const { toastError } = useToast();
 
   return useMutation({
-    mutationFn: (data: { body?: string; attachment_key?: string }) =>
+    mutationFn: (data: SendMessageRequest) =>
       apiFetch<Message>(`/conversations/${conversationId}/messages`, {
         method: "POST",
         body: JSON.stringify(data),
@@ -85,12 +91,7 @@ export function useCreateConversation() {
   const { toastError } = useToast();
 
   return useMutation({
-    mutationFn: (data: {
-      participant?: string;
-      participants?: string[];
-      is_group?: boolean;
-      name?: string;
-    }) =>
+    mutationFn: (data: CreateConversationRequest) =>
       apiFetch<Conversation>("/conversations", {
         method: "POST",
         body: JSON.stringify(data),

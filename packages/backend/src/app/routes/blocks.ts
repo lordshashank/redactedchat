@@ -6,7 +6,7 @@ export const blockRoutes: RouteConfig[] = [
     method: "POST",
     path: "/profiles/:nullifier/block",
     auth: { strategy: "session" },
-    rateLimit: { windowMs: 60_000, max: 10 },
+    rateLimit: { windowMs: 60_000, max: 20 },
     handler: async (ctx) => {
       const me = ctx.auth.userId;
       const target = ctx.params.nullifier;

@@ -1,13 +1,13 @@
 import type { RouteConfig } from "../../server/router.js";
 import type { QueryFn } from "../../db/pool.js";
-import { parseQueryParams, parseCursor, cursorResponse } from "../../app/helpers.js";
+import { parseQueryParams, parseCursor, cursorResponse, buildCursorClause, notify } from "../../app/helpers.js";
 
 export const likeRoutes: RouteConfig[] = [
   {
     method: "POST",
     path: "/posts/:id/like",
     auth: { strategy: "session" },
-    rateLimit: { windowMs: 60_000, max: 60 },
+    rateLimit: { windowMs: 60_000, max: 120 },
     handler: async (ctx) => {
       const postId = ctx.params.id;
       const nullifier = ctx.auth.userId;
@@ -50,30 +50,15 @@ export const likeRoutes: RouteConfig[] = [
         return { liked: toggled, like_count: updated.rows[0].like_count };
       });
 
-      // Fire-and-forget notification on like (not unlike) — outside transaction
+      // Fire-and-forget notification on like (not unlike)
       if (liked) {
-        try {
-          const postResult = await ctx.db.query(
-            "SELECT author_nullifier FROM posts WHERE id = $1",
-            [postId]
-          );
-          if (postResult.rows.length > 0) {
-            const authorNullifier = postResult.rows[0].author_nullifier;
-            if (authorNullifier !== nullifier) {
-              ctx.db.query(
-                `INSERT INTO notifications (recipient_nullifier, type, actor_nullifier, post_id)
-                 SELECT $1, $2, $3, $4
-                 WHERE NOT EXISTS (
-                   SELECT 1 FROM notifications
-                   WHERE recipient_nullifier = $1 AND type = $2 AND actor_nullifier = $3 AND post_id = $4
-                 )`,
-                [authorNullifier, "like", nullifier, postId]
-              ).catch(() => {});
+        ctx.db.query("SELECT author_nullifier FROM posts WHERE id = $1", [postId])
+          .then(({ rows }) => {
+            if (rows[0]) {
+              notify(ctx.db, { recipient: rows[0].author_nullifier as string, type: "like", actor: nullifier, postId, dedup: true });
             }
-          }
-        } catch {
-          // notification is fire-and-forget, never fail parent operation
-        }
+          })
+          .catch(() => {});
       }
 
       return {
@@ -92,12 +77,7 @@ export const likeRoutes: RouteConfig[] = [
       const { cursor, limit } = parseCursor(params);
 
       const queryParams: unknown[] = [postId, limit + 1];
-      let cursorClause = "";
-
-      if (cursor) {
-        cursorClause = "AND l.created_at < $3";
-        queryParams.push(cursor);
-      }
+      const cursorClause = buildCursorClause(cursor, queryParams, "l.created_at");
 
       const result = await ctx.db.query(
         `SELECT l.nullifier, l.created_at, pr.public_balance, pr.avatar_key
