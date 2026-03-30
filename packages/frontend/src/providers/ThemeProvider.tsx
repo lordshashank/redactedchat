@@ -113,7 +113,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     } else {
       // Auto-detect system preference for first-time visitors
       const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      setThemeId(prefersDark ? "matrix" : "warm-coral");
+      setThemeId(prefersDark ? "brutalist" : "warm-coral");
     }
   }, []);
 

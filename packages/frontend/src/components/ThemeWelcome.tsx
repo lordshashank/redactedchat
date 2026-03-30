@@ -7,7 +7,7 @@ import { Icon } from "./Icon";
 
 const THEME_KEY = "ghostbalance-theme";
 
-const DARK_THEMES = ["matrix", "cyan-m3", "synthwave", "art-deco-noir", "forest-organic", "brutalist"];
+const DARK_THEMES = ["brutalist", "matrix", "cyan-m3", "synthwave", "art-deco-noir", "forest-organic"];
 const LIGHT_THEMES = ["warm-coral", "clean-teal"];
 
 export function ThemeWelcome() {

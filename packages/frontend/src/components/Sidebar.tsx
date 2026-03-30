@@ -30,7 +30,17 @@ export function Sidebar() {
     <aside className="hidden md:flex md:w-[72px] lg:w-[280px] h-screen sticky top-0 border-r border-outline flex-col py-8 md:px-2 lg:px-6 md:items-center lg:items-stretch bg-background z-50 shrink-0">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2 mb-10 md:justify-center lg:justify-start">
-        <Icon name="terminal" filled className="text-primary text-3xl" />
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 12" className="w-7 h-7 text-primary" shapeRendering="crispEdges">
+          {/* Row 0 */}<rect x="4" y="0" width="6" height="1" fill="currentColor"/>
+          {/* Row 1 */}<rect x="3" y="1" width="8" height="1" fill="currentColor"/>
+          {/* Row 2 */}<rect x="2" y="2" width="10" height="1" fill="currentColor"/>
+          {/* Row 3 */}<rect x="1" y="3" width="12" height="1" fill="currentColor"/>
+          {/* Row 4 - eyes */}<rect x="1" y="4" width="2" height="1" fill="currentColor"/><rect x="5" y="4" width="4" height="1" fill="currentColor"/><rect x="11" y="4" width="2" height="1" fill="currentColor"/>
+          {/* Row 5 - eyes */}<rect x="1" y="5" width="2" height="1" fill="currentColor"/><rect x="5" y="5" width="4" height="1" fill="currentColor"/><rect x="11" y="5" width="2" height="1" fill="currentColor"/>
+          {/* Row 6-9 body */}<rect x="0" y="6" width="14" height="4" fill="currentColor"/>
+          {/* Row 10 - legs */}<rect x="0" y="10" width="2" height="1" fill="currentColor"/><rect x="3" y="10" width="3" height="1" fill="currentColor"/><rect x="8" y="10" width="3" height="1" fill="currentColor"/><rect x="12" y="10" width="2" height="1" fill="currentColor"/>
+          {/* Row 11 - feet */}<rect x="0" y="11" width="1" height="1" fill="currentColor"/><rect x="4" y="11" width="2" height="1" fill="currentColor"/><rect x="8" y="11" width="2" height="1" fill="currentColor"/><rect x="13" y="11" width="1" height="1" fill="currentColor"/>
+        </svg>
         <span className="hidden lg:inline text-2xl font-bold tracking-tighter text-primary matrix-glow">
           GhostBalance
         </span>

@@ -196,7 +196,7 @@ function EditProfileForm({
         </div>
         <div className="flex-1">
           <label className="text-[10px] text-on-surface-variant/60 font-mono uppercase tracking-widest block mb-1">
-            Age (optional)
+            Age
           </label>
           <input
             type="number"

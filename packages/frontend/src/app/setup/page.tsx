@@ -742,7 +742,7 @@ function SetupPageInner() {
                 </div>
                 <div className="flex-1 space-y-3">
                   <label className="text-[10px] uppercase tracking-widest text-primary font-bold font-mono">
-                    Age <span className="text-on-surface-variant/60">(optional)</span>
+                    Age
                   </label>
                   <input
                     type="number"

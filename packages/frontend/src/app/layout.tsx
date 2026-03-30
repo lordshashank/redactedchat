@@ -14,9 +14,34 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["300", "400", "500", "600", "700"],
 });
 
+const siteUrl = "https://ghostbalance.chat";
+const description = "The only social network where your balance speaks but your identity stays hidden.";
+
 export const metadata: Metadata = {
-  title: "GhostBalance",
-  description: "ZK balance proof for anonymous chat",
+  title: {
+    default: "GhostBalance",
+    template: "%s | GhostBalance",
+  },
+  description,
+  metadataBase: new URL(siteUrl),
+  openGraph: {
+    title: "GhostBalance",
+    description,
+    url: siteUrl,
+    siteName: "GhostBalance",
+    type: "website",
+    locale: "en_US",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "GhostBalance",
+    description,
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  keywords: ["zk", "zero knowledge", "ethereum", "anonymous", "social", "proof of balance"],
 };
 
 // Inline script to prevent FOUC. Sets critical CSS variables from localStorage
@@ -25,7 +50,7 @@ const themeInitScript = `
 (function(){
   try {
     var t = localStorage.getItem("ghostbalance-theme");
-    if (!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "matrix" : "warm-coral";
+    if (!t) t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "brutalist" : "warm-coral";
     var m = {
       "matrix":        { bg:"#000000", p:"#10b981", os:"#10b981", sf:"#000000", sc2:"#080808", ov:"#10b981", ol:"rgba(16,185,129,0.2)", gr:"0.015", sc:"0" },
       "cyan-m3":       { bg:"#0e0e13", p:"#8ff5ff", os:"#f9f5fd", sf:"#19191f", sc2:"#1f1f26", ov:"#acaab1", ol:"rgba(6,182,212,0.1)", gr:"0.015", sc:"0" },
