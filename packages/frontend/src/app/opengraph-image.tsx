@@ -1,6 +1,5 @@
 import { ImageResponse } from "next/og";
 
-export const runtime = "edge";
 export const alt = "GhostBalance - The only social network where your balance speaks but your identity stays hidden.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
