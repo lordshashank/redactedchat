@@ -9,8 +9,8 @@ export function weiToEth(weiString: string): number {
 export function formatBalance(weiString: string): string {
   const eth = weiToEth(weiString);
   if (eth === 0) return "0 ETH";
-  if (eth < 0.01) return "<0.01 ETH";
-  if (eth < 1) return `${eth.toFixed(2)} ETH`;
+  if (eth < 0.001) return "<0.001 ETH";
+  if (eth < 1) return `${eth.toFixed(3)} ETH`;
   if (eth < 100) return `${eth.toFixed(1)} ETH`;
   return `${Math.floor(eth).toLocaleString()} ETH`;
 }

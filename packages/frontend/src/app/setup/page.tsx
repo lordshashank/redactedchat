@@ -206,11 +206,11 @@ function SetupPageInner() {
 
   const [publicBalance, setPublicBalance] = useState("");
   const [nullifierSeed, setNullifierSeed] = useState("");
+  const [nullifierSeedTouched, setNullifierSeedTouched] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [completedSteps, setCompletedSteps] = useState<string[]>([]);
-  const [verifyResult, setVerifyResult] = useState<VerifyResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Step 2: Profile details
@@ -227,8 +227,9 @@ function SetupPageInner() {
     status !== "profile_details";
 
   const hasOnChainBalance = walletBalance && walletBalance.value > 0n;
+  const nullifierSeedEmpty = nullifierSeedTouched && nullifierSeed === "";
   const canGenerateProof =
-    isConnected && !isReconnecting && hasOnChainBalance && publicBalance && parseFloat(publicBalance) >= 0 && !isWorking;
+    isConnected && !isReconnecting && hasOnChainBalance && publicBalance && parseFloat(publicBalance) >= 0 && !isWorking && !nullifierSeedEmpty;
 
   const proofCompleted = status === "profile_details" || status === "done";
 
@@ -241,7 +242,7 @@ function SetupPageInner() {
     setStatus("signing");
     setStatusMessage("Signing identity message...");
     setCompletedSteps([]);
-    setVerifyResult(null);
+
     setError(null);
 
     const addStep = (step: string) =>
@@ -255,17 +256,27 @@ function SetupPageInner() {
       addStep("Public key recovered from signature");
 
       setStatus("fetching_data");
-      setStatusMessage("Fetching latest block...");
-      const blockNumber = await publicClient.getBlockNumber();
-      addStep(`Block number fetched: ${blockNumber}`);
+      setStatusMessage("Fetching latest block and state proof...");
 
-      setStatusMessage("Fetching Ethereum state proof...");
-      const proofData = await fetchProofData(
-        publicClient as Parameters<typeof fetchProofData>[0],
-        address as Hex,
-        blockNumber
-      );
-      addStep(`State proof fetched (${proofData.mpt.depth} nodes, ${proofData.header.rlpLen}B header)`);
+      let blockNumber!: bigint;
+      let proofData!: Awaited<ReturnType<typeof fetchProofData>>;
+      const maxRetries = 3;
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        blockNumber = await publicClient.getBlockNumber();
+        try {
+          proofData = await fetchProofData(
+            publicClient as Parameters<typeof fetchProofData>[0],
+            address as Hex,
+            blockNumber
+          );
+          break;
+        } catch (err) {
+          if (attempt === maxRetries - 1) throw err;
+          addStep(`Block ${blockNumber} proof unavailable, retrying with newer block...`);
+          await new Promise((r) => setTimeout(r, 4000));
+        }
+      }
+      addStep(`Block ${blockNumber!} state proof fetched`);
 
       const pubBalanceWei = parseEther(publicBalance);
       let nullSeedWei: bigint;
@@ -365,7 +376,7 @@ function SetupPageInner() {
           method: "POST",
           body: JSON.stringify(proofBody),
         });
-        setVerifyResult(result);
+
         addStep("Server verification complete");
 
         setStatusMessage("Updating balance...");
@@ -388,7 +399,7 @@ function SetupPageInner() {
           method: "POST",
           body: JSON.stringify(proofBody),
         });
-        setVerifyResult(result);
+
         addStep("Signed in successfully");
         await refreshProfile();
         setStatus("done");
@@ -584,12 +595,13 @@ function SetupPageInner() {
                     <div className="relative">
                       <input
                         type="number"
-                        value={nullifierSeed || (isReprove
+                        value={nullifierSeedTouched ? nullifierSeed : (isReprove
                           ? (() => { const s = loadNullifierSeed(); return s ? formatEther(BigInt(s)) : user?.initial_balance ? formatEther(BigInt(user.initial_balance)) : ""; })()
                           : publicBalance)}
-                        onChange={(e) => setNullifierSeed(e.target.value)}
+                        onChange={(e) => { setNullifierSeedTouched(true); setNullifierSeed(e.target.value); }}
                         onFocus={() => {
-                          if (!nullifierSeed) {
+                          if (!nullifierSeedTouched) {
+                            setNullifierSeedTouched(true);
                             if (isReprove) {
                               const s = loadNullifierSeed();
                               setNullifierSeed(s ? formatEther(BigInt(s)) : user?.initial_balance ? formatEther(BigInt(user.initial_balance)) : "");
@@ -605,6 +617,11 @@ function SetupPageInner() {
                       />
                       <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-on-surface-variant/60 font-mono">ETH</span>
                     </div>
+                    {nullifierSeedEmpty && (
+                      <p className="text-[11px] text-red-500 font-mono">
+                        Nullifier seed cannot be empty.
+                      </p>
+                    )}
                   </div>
                   <div className="border border-primary/30 p-3 space-y-2">
                     <p className="text-[10px] uppercase tracking-widest text-primary font-bold font-mono flex items-center gap-1">

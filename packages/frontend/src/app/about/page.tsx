@@ -36,6 +36,12 @@ export default function AboutPage() {
           </p>
         </section>
 
+        <div className="border-l-4 border-primary pl-5 py-2">
+          <p className="text-lg font-bold italic text-on-surface font-mono leading-relaxed">
+            &ldquo;Your balance is your identity, and your identity is no one&apos;s business.&rdquo;
+          </p>
+        </div>
+
         {/* Why GhostBalance? */}
         <section className="space-y-3">
           <div className="flex items-center gap-3">

@@ -158,7 +158,7 @@ export default function OGImage() {
 
           {/* Bottom row - tags */}
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {["ZK Proofs", "Ethereum", "Anonymous"].map((tag) => (
+            {["ZK Proofs", "Ethereum", "Privacy"].map((tag) => (
               <div
                 key={tag}
                 style={{

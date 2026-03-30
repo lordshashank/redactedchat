@@ -6,7 +6,8 @@ export interface Tier {
 
 const TIERS: Tier[] = [
   { name: "Dust", minEth: 0, maxEth: 0 },
-  { name: "Normie", minEth: 0, maxEth: 1 },
+  { name: "Rookie", minEth: 0, maxEth: 0.1 },
+  { name: "Normie", minEth: 0.1, maxEth: 1 },
   { name: "Degen", minEth: 1, maxEth: 10 },
   { name: "Shark", minEth: 10, maxEth: 50 },
   { name: "Cartel", minEth: 50, maxEth: 100 },
