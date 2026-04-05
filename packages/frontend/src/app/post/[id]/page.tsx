@@ -11,7 +11,7 @@ import { ImageDisplay } from "@/components/ImageDisplay";
 import type { Post as BackendPost } from "@/lib/types";
 import { formatBalance, formatRelativeTime } from "@/lib/format";
 import { useAuth } from "@/hooks/useAuth";
-import { usePost, useThread, useCreatePost, useRecordView } from "@/hooks/usePost";
+import { usePost, useThread, useParentChain, useCreatePost, useRecordView } from "@/hooks/usePost";
 
 function PostRightSidebar({ post }: { post: BackendPost | undefined }) {
   if (!post) return null;
@@ -86,6 +86,7 @@ export default function PostDetailPage({
   const { user, isAuthenticated } = useAuth();
   const post = usePost(id);
   const thread = useThread(id);
+  const parentChain = useParentChain(post.data);
   const recordView = useRecordView();
   const createPost = useCreatePost();
 
@@ -111,6 +112,17 @@ export default function PostDetailPage({
           <p className="text-sm font-mono text-on-surface-variant/60">
             Loading...
           </p>
+        </div>
+      )}
+
+      {/* Parent chain (ancestors above the current post) */}
+      {parentChain.data && parentChain.data.length > 0 && (
+        <div className="border-b border-outline/30">
+          {parentChain.data.map((ancestor) => (
+            <div key={ancestor.id} className="border-b border-outline/20">
+              <PostItem post={ancestor} showThreadLine />
+            </div>
+          ))}
         </div>
       )}
 

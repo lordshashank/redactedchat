@@ -3,6 +3,7 @@
 import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./MobileNav";
 import { ThemeWelcome } from "./ThemeWelcome";
+import { WelcomeDialog } from "./WelcomeDialog";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -16,6 +17,7 @@ export function AppLayout({ children, rightSidebar }: AppLayoutProps) {
       <main className="flex-1 flex min-w-0">
         <div className="relative w-full xl:w-[600px] xl:shrink-0 border-r border-outline min-h-screen bg-background pb-[72px] md:pb-0">
           <ThemeWelcome />
+          <WelcomeDialog />
           {children}
         </div>
         {rightSidebar && (

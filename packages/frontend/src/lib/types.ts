@@ -198,3 +198,67 @@ export interface SendMessageRequest {
   body?: string;
   attachment_key?: string;
 }
+
+// ── Feedback types ─────────────────────────────────────────────
+
+export type FeedbackType = "bug" | "feature" | "improvement" | "question";
+
+export type FeedbackStatus =
+  | "open"
+  | "under_review"
+  | "planned"
+  | "in_progress"
+  | "done"
+  | "rejected"
+  | "duplicate";
+
+export interface FeedbackPost {
+  id: string;
+  user_id: string;
+  type: FeedbackType;
+  title: string;
+  description: string;
+  vote_count: number;
+  status: FeedbackStatus;
+  priority: string | null;
+  admin_note: string | null;
+  duplicate_of: string | null;
+  created_at: string;
+  updated_at: string;
+  user_has_voted: boolean;
+  attachments?: { key: string; url: string; position: number }[];
+}
+
+export interface FeedbackComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  body: string;
+  is_admin: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FeedbackPostDetail extends FeedbackPost {
+  comments: FeedbackComment[];
+}
+
+export interface FeedbackListResponse {
+  posts: FeedbackPost[];
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface FeedbackVoteResult {
+  voted: boolean;
+  vote_count: number;
+}
+
+export interface CreateFeedbackRequest {
+  type: FeedbackType;
+  title: string;
+  description: string;
+  attachment_keys?: string[];
+}

@@ -1,11 +1,13 @@
 "use client";
 
+import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "./Icon";
 import { useAuth } from "@/hooks/useAuth";
 import { useUnreadCount } from "@/hooks/useNotifications";
 import { useUnreadConversationsCount } from "@/hooks/useConversations";
+import { useClickOutside } from "@/hooks/useClickOutside";
 import { formatBalance, weiToEth } from "@/lib/format";
 import { getTierName } from "@/lib/tiers";
 
@@ -16,8 +18,13 @@ const NAV_ITEMS = [
   { href: "/profile", icon: "person", label: "Profile" },
   { href: "/leaderboard", icon: "leaderboard", label: "Leaderboard" },
   { href: "/bookmarks", icon: "bookmark", label: "Bookmarks" },
+];
+
+const MORE_ITEMS = [
+  { href: "/feedback", icon: "feedback", label: "Feedback" },
   { href: "/about", icon: "info", label: "About" },
   { href: "/settings", icon: "settings", label: "Settings" },
+  { href: "https://t.me/+TXVTCJC4cuZhYWU9", icon: "help", label: "Help", external: true },
 ];
 
 export function Sidebar() {
@@ -25,6 +32,13 @@ export function Sidebar() {
   const { user, isAuthenticated } = useAuth();
   const { data: unread } = useUnreadCount();
   const { data: unreadConversations } = useUnreadConversationsCount();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+
+  const moreIsActive = MORE_ITEMS.some((item) => !item.external && pathname.startsWith(item.href));
+
+  const closeMore = useCallback(() => setMoreOpen(false), []);
+  useClickOutside(moreRef, closeMore, moreOpen);
 
   return (
     <aside className="hidden md:flex md:w-[72px] lg:w-[280px] h-screen sticky top-0 border-r border-outline flex-col py-8 md:px-2 lg:px-6 md:items-center lg:items-stretch bg-background z-50 shrink-0">
@@ -83,6 +97,61 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {/* More menu */}
+        <div ref={moreRef} className="relative">
+          <button
+            onClick={() => setMoreOpen((v) => !v)}
+            data-tooltip="More"
+            className={`w-full sidebar-tooltip ${
+              moreIsActive
+                ? "flex items-center gap-4 py-3 text-primary font-bold md:justify-center lg:justify-start transition-all"
+                : "flex items-center gap-4 py-3 text-on-surface-variant hover:text-primary hover:bg-primary/5 md:justify-center lg:justify-start transition-all duration-300"
+            }`}
+          >
+            <span className="w-[26px] h-[26px] flex items-center justify-center border-2 border-current rounded-full">
+              <Icon name="more_horiz" filled={moreIsActive} className="text-[16px]" />
+            </span>
+            <span className="hidden lg:inline font-medium">More</span>
+          </button>
+
+          {moreOpen && (
+            <div className="absolute left-0 lg:left-0 bottom-full mb-1 md:min-w-[200px] bg-surface border border-outline shadow-lg z-50">
+              {MORE_ITEMS.map((item) => {
+                const isActive = !item.external && pathname.startsWith(item.href);
+                const className = `flex items-center gap-3 px-4 py-3 ${
+                  isActive
+                    ? "text-primary font-bold bg-primary/10"
+                    : "text-on-surface-variant hover:text-primary hover:bg-primary/5"
+                } transition-all duration-200`;
+
+                return item.external ? (
+                  <a
+                    key={item.href}
+                    href={item.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setMoreOpen(false)}
+                    className={className}
+                  >
+                    <Icon name={item.icon} />
+                    <span className="font-medium">{item.label}</span>
+                  </a>
+                ) : (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setMoreOpen(false)}
+                    className={className}
+                  >
+                    <Icon name={item.icon} filled={isActive} />
+                    <span className="font-medium">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </nav>
 
       {/* User info — hidden in icon-only mode */}

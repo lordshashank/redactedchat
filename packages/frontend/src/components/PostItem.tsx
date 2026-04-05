@@ -22,9 +22,10 @@ import { useToast } from "@/providers/ToastProvider";
 
 interface PostItemProps {
   post: Post;
+  showThreadLine?: boolean;
 }
 
-export function PostItem({ post }: PostItemProps) {
+export function PostItem({ post, showThreadLine }: PostItemProps) {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
   const like = useLike();
@@ -37,6 +38,7 @@ export function PostItem({ post }: PostItemProps) {
   const { toastSuccess, toastError } = useToast();
 
   const { data: originalPost } = usePost(post.repost_of_id);
+  const { data: parentPost } = usePost(post.parent_id);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -99,23 +101,26 @@ export function PostItem({ post }: PostItemProps) {
       )}
 
       <div className="flex gap-4">
-        {/* Avatar */}
-        <Link
-          href={`/profile/${post.author_nullifier}`}
-          onClick={(e) => e.stopPropagation()}
-          className="shrink-0"
-        >
-          <div className="w-12 h-12 bg-primary/10 border border-outline flex items-center justify-center overflow-hidden">
-            {post.avatar_key ? (
-              <ImageDisplay
-                uploadKey={post.avatar_key}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <Icon name="person" className="text-on-surface-variant/60" />
-            )}
-          </div>
-        </Link>
+        <div className="flex flex-col items-center shrink-0">
+          <Link
+            href={`/profile/${post.author_nullifier}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 bg-primary/10 border border-outline flex items-center justify-center overflow-hidden">
+              {post.avatar_key ? (
+                <ImageDisplay
+                  uploadKey={post.avatar_key}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <Icon name="person" className="text-on-surface-variant/60" />
+              )}
+            </div>
+          </Link>
+          {showThreadLine && (
+            <div className="w-0.5 flex-1 mt-2 bg-outline/40" />
+          )}
+        </div>
 
         <div className="flex-1 min-w-0 space-y-3">
           {/* Header */}
@@ -136,6 +141,19 @@ export function PostItem({ post }: PostItemProps) {
               </span>
             </div>
           </div>
+
+          {post.parent_id && (
+            <Link
+              href={`/post/${post.parent_id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center gap-1 text-[11px] text-on-surface-variant/50 font-mono hover:text-primary/70 transition-colors -mt-1"
+            >
+              <span>Replying to</span>
+              <span className="text-primary/60">
+                {parentPost ? formatBalance(parentPost.public_balance) : "..."}
+              </span>
+            </Link>
+          )}
 
           {/* Body */}
           <Link href={`/post/${post.id}`} onClick={(e) => e.stopPropagation()}>

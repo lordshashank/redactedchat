@@ -19,6 +19,13 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
     ...userStrategies,
     { strategy: "bearer" },
   ];
+  const readAuth: AuthRequirement =
+    userAuth === "public"
+      ? "public"
+      : userStrategies.map((strategy) => ({
+          ...strategy,
+          optional: true,
+        }));
 
   return [
     // Create a feedback post
@@ -27,10 +34,11 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
       path: "/feedback",
       auth: userAuth,
       handler: async (ctx) => {
-        const { type, title, description } = ctx.body as {
+        const { type, title, description, attachment_keys } = ctx.body as {
           type?: string;
           title?: string;
           description?: string;
+          attachment_keys?: string[];
         };
 
         if (!type || !title || !description) {
@@ -48,14 +56,61 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
           };
         }
 
-        const result = await ctx.db.query(
-          `INSERT INTO feedback_posts (user_id, type, title, description)
-           VALUES ($1, $2, $3, $4)
-           RETURNING *`,
-          [ctx.auth.userId, type, title, description]
+        if (Array.isArray(attachment_keys) && attachment_keys.length > 4) {
+          return {
+            status: 400,
+            json: { error: "Maximum of 4 attachments allowed" },
+          };
+        }
+
+        if (title.length > 200) {
+          return { status: 400, json: { error: "Title must be 200 characters or less" } };
+        }
+        if (description.length > 5000) {
+          return { status: 400, json: { error: "Description must be 5000 characters or less" } };
+        }
+
+        const { post: createdPost, attachmentKeys: insertedKeys } = await ctx.db.transaction(async (query) => {
+          const result = await query(
+            `INSERT INTO feedback_posts (user_id, type, title, description)
+             VALUES ($1, $2, $3, $4)
+             RETURNING *`,
+            [ctx.auth.userId, type, title, description]
+          );
+
+          const post = result.rows[0] as { id: string };
+          let insertedKeys: string[] = [];
+
+          if (Array.isArray(attachment_keys) && attachment_keys.length > 0) {
+            const verified = await query<{ key: string }>(
+              "SELECT key FROM uploads WHERE key = ANY($1) AND user_id = $2 AND status = 'completed'",
+              [attachment_keys, ctx.auth.userId]
+            );
+            const validKeys = new Set(verified.rows.map((r) => r.key));
+            // Preserve original order from attachment_keys
+            insertedKeys = attachment_keys.filter((k) => validKeys.has(k));
+
+            for (let i = 0; i < insertedKeys.length; i++) {
+              await query(
+                "INSERT INTO feedback_attachments (post_id, upload_key, position) VALUES ($1, $2, $3)",
+                [post.id, insertedKeys[i], i]
+              );
+            }
+          }
+
+          return { post: result.rows[0], attachmentKeys: insertedKeys };
+        });
+
+        // Generate signed URLs outside the transaction
+        const attachments = await Promise.all(
+          insertedKeys.map(async (key, i) => ({
+            key,
+            url: await ctx.storage.getSignedUrl(key),
+            position: i,
+          }))
         );
 
-        return { status: 201, json: result.rows[0] };
+        return { status: 201, json: { ...createdPost, attachments } };
       },
     },
 
@@ -63,7 +118,7 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
     {
       method: "GET",
       path: "/feedback",
-      auth: userAuth,
+      auth: readAuth,
       handler: async (ctx) => {
         const url = new URL(ctx.req.url ?? "/", "http://localhost");
         const status = url.searchParams.get("status");
@@ -97,14 +152,12 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
             ? "p.vote_count DESC, p.created_at DESC"
             : "p.created_at DESC";
 
-        // Count total for pagination
         const countResult = await ctx.db.query(
           `SELECT COUNT(*) as total FROM feedback_posts p ${where}`,
           params
         );
         const total = parseInt(String(countResult.rows[0].total), 10);
 
-        // Fetch posts with user_has_voted
         params.push(ctx.auth.userId);
         const userIdParam = paramIdx++;
         params.push(limit);
@@ -123,10 +176,38 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
           params
         );
 
+        const posts = result.rows;
+        if (posts.length > 0) {
+          const postIds = posts.map((p: any) => p.id);
+          const attachmentsResult = await ctx.db.query(
+            `SELECT post_id, upload_key, position FROM feedback_attachments WHERE post_id = ANY($1) ORDER BY position ASC`,
+            [postIds]
+          );
+
+          const rows = attachmentsResult.rows as { post_id: string; upload_key: string; position: number }[];
+          const urls = await Promise.all(rows.map((r) => ctx.storage.getSignedUrl(r.upload_key)));
+          const attachmentsByPost: Record<string, { key: string; url: string; position: number }[]> = {};
+          for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            if (!attachmentsByPost[row.post_id]) {
+              attachmentsByPost[row.post_id] = [];
+            }
+            attachmentsByPost[row.post_id].push({
+              key: row.upload_key,
+              url: urls[i],
+              position: row.position,
+            });
+          }
+
+          for (const post of posts as any[]) {
+            post.attachments = attachmentsByPost[post.id] || [];
+          }
+        }
+
         return {
           status: 200,
           json: {
-            posts: result.rows,
+            posts,
             page,
             limit,
             total,
@@ -136,11 +217,11 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
       },
     },
 
-    // Get a single feedback post with comments
+    // Get a single feedback post with comments and attachments
     {
       method: "GET",
       path: "/feedback/:id",
-      auth: userAuth,
+      auth: readAuth,
       handler: async (ctx) => {
         const postId = ctx.params.id;
 
@@ -164,11 +245,26 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
           [postId]
         );
 
+        const attachmentsResult = await ctx.db.query(
+          `SELECT upload_key, position FROM feedback_attachments WHERE post_id = $1 ORDER BY position ASC`,
+          [postId]
+        );
+
+        const attRows = attachmentsResult.rows as { upload_key: string; position: number }[];
+        const attachments = await Promise.all(
+          attRows.map(async (row) => ({
+            key: row.upload_key,
+            url: await ctx.storage.getSignedUrl(row.upload_key),
+            position: row.position,
+          }))
+        );
+
         return {
           status: 200,
           json: {
             ...postResult.rows[0],
             comments: commentsResult.rows,
+            attachments,
           },
         };
       },
@@ -183,7 +279,6 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
         const postId = ctx.params.id;
         const userId = ctx.auth.userId;
 
-        // Check post exists
         const postCheck = await ctx.db.query(
           "SELECT id FROM feedback_posts WHERE id = $1",
           [postId]
@@ -192,7 +287,6 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
           return { status: 404, json: { error: "Post not found" } };
         }
 
-        // Check if already voted
         const existing = await ctx.db.query(
           "SELECT 1 FROM feedback_votes WHERE post_id = $1 AND user_id = $2",
           [postId, userId]
@@ -249,7 +343,6 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
           return { status: 400, json: { error: "Missing required field: body" } };
         }
 
-        // Check post exists
         const postCheck = await ctx.db.query(
           "SELECT id FROM feedback_posts WHERE id = $1",
           [postId]
@@ -279,7 +372,6 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
       handler: async (ctx) => {
         const postId = ctx.params.id;
 
-        // Admin can delete any post
         if (ctx.auth.strategy === "bearer") {
           const result = await ctx.db.query(
             "DELETE FROM feedback_posts WHERE id = $1 RETURNING id",
@@ -291,7 +383,6 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
           return { status: 200, json: { ok: true } };
         }
 
-        // Users can only delete their own posts
         const result = await ctx.db.query(
           "DELETE FROM feedback_posts WHERE id = $1 AND user_id = $2 RETURNING id",
           [postId, ctx.auth.userId]
@@ -313,7 +404,6 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
       handler: async (ctx) => {
         const { commentId } = ctx.params;
 
-        // Admin can delete any comment
         if (ctx.auth.strategy === "bearer") {
           const result = await ctx.db.query(
             "DELETE FROM feedback_comments WHERE id = $1 RETURNING id",
@@ -325,7 +415,6 @@ export function createFeedbackRoutes(config: FeedbackConfig): RouteConfig[] {
           return { status: 200, json: { ok: true } };
         }
 
-        // Users can only delete their own comments
         const result = await ctx.db.query(
           "DELETE FROM feedback_comments WHERE id = $1 AND user_id = $2 RETURNING id",
           [commentId, ctx.auth.userId]

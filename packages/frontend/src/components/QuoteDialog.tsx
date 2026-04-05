@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { Icon } from "@/components/Icon";
 import { ImageDisplay } from "@/components/ImageDisplay";
 import { Linkify } from "@/components/Linkify";
 import { FileUploader } from "@/components/FileUploader";
+import { useState } from "react";
 import type { Post } from "@/lib/types";
 import { formatBalance, formatRelativeTime } from "@/lib/format";
 import { useCreatePost } from "@/hooks/usePost";
+import { useAttachments } from "@/hooks/useAttachments";
 import { useToast } from "@/providers/ToastProvider";
 
 interface QuoteDialogProps {
@@ -18,25 +19,26 @@ interface QuoteDialogProps {
 
 export function QuoteDialog({ post, open, onClose }: QuoteDialogProps) {
   const [text, setText] = useState("");
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const att = useAttachments();
   const createPost = useCreatePost();
   const { toastSuccess } = useToast();
 
   if (!open) return null;
 
   const handleSubmit = () => {
-    if (!text.trim() && attachments.length === 0) return;
+    if (att.isUploading) return;
+    if (!text.trim() && att.keys.length === 0) return;
     createPost.mutate(
       {
         body: text || undefined,
         repost_of_id: post.id,
-        attachments: attachments.length > 0 ? attachments : undefined,
+        attachments: att.keys.length > 0 ? att.keys : undefined,
       },
       {
         onSuccess: () => {
           toastSuccess("Quote posted");
           setText("");
-          setAttachments([]);
+          att.clear();
           onClose();
         },
       },
@@ -70,13 +72,13 @@ export function QuoteDialog({ post, open, onClose }: QuoteDialogProps) {
           className="w-full bg-background border border-outline focus:border-primary focus:ring-0 text-on-surface p-3 font-mono text-sm resize-none min-h-[80px]"
           autoFocus
         />
-        {attachments.length > 0 && (
+        {att.keys.length > 0 && (
           <div className="flex gap-2">
-            {attachments.map((key, i) => (
+            {att.keys.map((key) => (
               <div key={key} className="relative w-16 h-16 border border-outline">
                 <ImageDisplay uploadKey={key} className="w-full h-full object-cover" />
                 <button
-                  onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                  onClick={() => att.remove(key)}
                   className="absolute top-0 right-0 bg-black/60 text-white text-xs p-0.5"
                 >
                   X
@@ -86,9 +88,12 @@ export function QuoteDialog({ post, open, onClose }: QuoteDialogProps) {
           </div>
         )}
         <div className="flex gap-4 text-on-surface-variant">
-          {attachments.length < 4 && (
+          {att.remaining > 0 && (
             <FileUploader
-              onComplete={(key) => setAttachments((prev) => prev.length < 4 ? [...prev, key] : prev)}
+              onComplete={att.add}
+              onUploadingChange={att.setIsUploading}
+              multiple
+              maxFiles={att.remaining}
               className="inline-block"
             >
               <Icon name="image" className="cursor-pointer hover:text-primary transition-colors" />
@@ -112,7 +117,7 @@ export function QuoteDialog({ post, open, onClose }: QuoteDialogProps) {
         <div className="flex justify-end">
           <button
             onClick={handleSubmit}
-            disabled={(!text.trim() && attachments.length === 0) || createPost.isPending}
+            disabled={(!text.trim() && att.keys.length === 0) || createPost.isPending || att.isUploading}
             className="px-6 py-2 bg-primary/10 border border-primary text-primary font-bold text-xs hover:bg-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-widest font-mono"
           >
             {createPost.isPending ? "POSTING..." : "QUOTE"}

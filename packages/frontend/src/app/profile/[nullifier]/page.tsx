@@ -106,11 +106,11 @@ function EditProfileForm({
     updateProfile.mutate(
       {
         bio: bio || null,
-        gender: gender || undefined,
+        gender: gender || null,
         age: age ? parseInt(age, 10) : null,
         avatar_key: editAvatarKey,
         banner_key: editBannerKey,
-      } as any,
+      },
       {
         onSuccess: () => {
           toastSuccess("Profile updated");

@@ -38,6 +38,10 @@ export function createPostRoutes(config: {
           return { status: 400, json: { error: "body exceeds maximum length" } };
         }
 
+        if (Array.isArray(attachments) && attachments.length > 4) {
+          return { status: 400, json: { error: "Maximum of 4 attachments allowed" } };
+        }
+
         if (parent_id && repost_of_id) {
           return { status: 400, json: { error: "a post cannot be both a reply and a repost" } };
         }

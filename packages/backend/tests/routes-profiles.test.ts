@@ -15,10 +15,10 @@ function createMockCtx(overrides: Partial<HandlerContext> = {}): HandlerContext 
     params: {},
     body: {},
     db: {
-      async query() { return { rows: [], rowCount: 0 }; },
-      async transaction(fn) { return fn(async () => ({ rows: [], rowCount: 0 })); },
+      query: async () => ({ rows: [], rowCount: 0 }) as any,
+      transaction: async (fn) => fn(async () => ({ rows: [], rowCount: 0 }) as any),
       async close() {},
-    },
+    } as DbAdapter,
     auth: { userId: "0xnullifier123", strategy: "session", publicBalance: "1000000000000000000", blockNumber: 100, blockHash: "0xhash" },
     changes: createNoopChangeNotifier(),
     storage: createNoopStorage(),
@@ -40,8 +40,8 @@ describe("Profile Routes", () => {
         public_balance: "1000000000000000000",
       };
       const db: DbAdapter = {
-        async query() { return { rows: [insertedRow], rowCount: 1 }; },
-        async transaction(fn) { return fn(async () => ({ rows: [insertedRow], rowCount: 1 })); },
+        query: async () => ({ rows: [insertedRow], rowCount: 1 }) as any,
+        transaction: async (fn) => fn(async () => ({ rows: [insertedRow], rowCount: 1 }) as any),
         async close() {},
       };
 
@@ -55,10 +55,22 @@ describe("Profile Routes", () => {
       assert.ok(result.headers?.["Set-Cookie"]?.includes("session="));
     });
 
-    it("rejects missing gender", async () => {
-      const ctx = createMockCtx({ body: { bio: "hello" } });
+    it("allows missing gender (optional field)", async () => {
+      const insertedRow = {
+        nullifier: "0xnullifier123",
+        bio: "hello",
+        gender: null,
+        public_balance: "1000000000000000000",
+      };
+      const db: DbAdapter = {
+        query: async () => ({ rows: [insertedRow], rowCount: 1 }) as any,
+        transaction: async (fn) => fn(async () => ({ rows: [insertedRow], rowCount: 1 }) as any),
+        async close() {},
+      };
+
+      const ctx = createMockCtx({ body: { bio: "hello" }, db });
       const result = await postProfile.handler(ctx);
-      assert.equal(result.status, 400);
+      assert.equal(result.status, 201);
     });
 
     it("rejects invalid gender", async () => {
@@ -69,8 +81,8 @@ describe("Profile Routes", () => {
 
     it("returns 409 when profile already exists", async () => {
       const db: DbAdapter = {
-        async query() { return { rows: [], rowCount: 0 }; },
-        async transaction(fn) { return fn(async () => ({ rows: [], rowCount: 0 })); },
+        query: async () => ({ rows: [], rowCount: 0 }) as any,
+        transaction: async (fn) => fn(async () => ({ rows: [], rowCount: 0 }) as any),
         async close() {},
       };
 
@@ -88,8 +100,8 @@ describe("Profile Routes", () => {
     it("returns profile when found", async () => {
       const profile = { nullifier: "0xabc", bio: "hi", gender: "male", public_balance: "0" };
       const db: DbAdapter = {
-        async query() { return { rows: [profile], rowCount: 1 }; },
-        async transaction(fn) { return fn(async () => ({ rows: [], rowCount: 0 })); },
+        query: async () => ({ rows: [profile], rowCount: 1 }) as any,
+        transaction: async (fn) => fn(async () => ({ rows: [], rowCount: 0 }) as any),
         async close() {},
       };
 
@@ -128,8 +140,8 @@ describe("Profile Routes", () => {
     it("updates profile with valid bio", async () => {
       const updated = { nullifier: "0xnullifier123", bio: "new bio", gender: "male" };
       const db: DbAdapter = {
-        async query() { return { rows: [updated], rowCount: 1 }; },
-        async transaction(fn) { return fn(async () => ({ rows: [], rowCount: 0 })); },
+        query: async () => ({ rows: [updated], rowCount: 1 }) as any,
+        transaction: async (fn) => fn(async () => ({ rows: [], rowCount: 0 }) as any),
         async close() {},
       };
 

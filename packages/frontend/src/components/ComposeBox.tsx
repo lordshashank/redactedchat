@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { Icon } from "@/components/Icon";
 import { ImageDisplay } from "@/components/ImageDisplay";
 import { FileUploader } from "@/components/FileUploader";
+import { useAttachments } from "@/hooks/useAttachments";
 
 interface ComposeBoxProps {
   placeholder?: string;
@@ -23,7 +24,7 @@ export function ComposeBox({
   onSubmit,
 }: ComposeBoxProps) {
   const [text, setText] = useState("");
-  const [attachments, setAttachments] = useState<string[]>([]);
+  const att = useAttachments();
   const [isPending, setIsPending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -35,12 +36,13 @@ export function ComposeBox({
   }, [text]);
 
   const handleSubmit = async () => {
-    if (!text.trim() && attachments.length === 0) return;
+    if (att.isUploading) return;
+    if (!text.trim() && att.keys.length === 0) return;
     setIsPending(true);
     try {
-      await onSubmit(text, attachments);
+      await onSubmit(text, att.keys);
       setText("");
-      setAttachments([]);
+      att.clear();
     } finally {
       setIsPending(false);
     }
@@ -67,13 +69,13 @@ export function ComposeBox({
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
-        {attachments.length > 0 && (
+        {att.keys.length > 0 && (
           <div className="flex gap-2 mt-2">
-            {attachments.map((key, i) => (
+            {att.keys.map((key) => (
               <div key={key} className="relative w-20 h-20 border border-outline">
                 <ImageDisplay uploadKey={key} className="w-full h-full object-cover" />
                 <button
-                  onClick={() => setAttachments((prev) => prev.filter((_, idx) => idx !== i))}
+                  onClick={() => att.remove(key)}
                   className="absolute top-0 right-0 bg-black/60 text-white text-xs p-0.5"
                 >
                   X
@@ -84,9 +86,12 @@ export function ComposeBox({
         )}
         <div className="flex items-center justify-between mt-4">
           <div className="flex gap-4 text-on-surface-variant">
-            {attachments.length < 4 && (
+            {att.remaining > 0 && (
               <FileUploader
-                onComplete={(key) => setAttachments((prev) => prev.length < 4 ? [...prev, key] : prev)}
+                onComplete={att.add}
+                onUploadingChange={att.setIsUploading}
+                multiple
+                maxFiles={att.remaining}
                 className="inline-block"
               >
                 <Icon
@@ -103,7 +108,7 @@ export function ComposeBox({
           </div>
           <button
             onClick={handleSubmit}
-            disabled={(!text.trim() && attachments.length === 0) || isPending}
+            disabled={(!text.trim() && att.keys.length === 0) || isPending || att.isUploading}
             className="px-6 py-2 bg-primary/10 border border-primary text-primary font-bold text-xs hover:bg-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-widest font-mono"
           >
             {isPending ? pendingLabel : submitLabel}

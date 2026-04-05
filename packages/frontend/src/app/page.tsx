@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
@@ -51,11 +51,18 @@ function FeedRightSidebar() {
               className="flex items-center justify-between group"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary/10 border border-outline flex items-center justify-center">
-                  <Icon
-                    name="person"
-                    className="text-on-surface-variant/60 text-sm"
-                  />
+                <div className="w-10 h-10 bg-primary/10 border border-outline flex items-center justify-center overflow-hidden">
+                  {u.avatar_key ? (
+                    <ImageDisplay
+                      uploadKey={u.avatar_key}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <Icon
+                      name="person"
+                      className="text-on-surface-variant/60 text-sm"
+                    />
+                  )}
                 </div>
                 <p className="text-sm font-bold text-primary matrix-glow">
                   {formatBalance(u.public_balance)}

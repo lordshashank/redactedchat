@@ -18,6 +18,7 @@ const MOBILE_NAV_ITEMS = [
 const MORE_ITEMS = [
   { href: "/leaderboard", icon: "leaderboard", label: "Leaderboard" },
   { href: "/bookmarks", icon: "bookmark", label: "Bookmarks" },
+  { href: "/feedback", icon: "feedback", label: "Feedback" },
   { href: "/settings", icon: "settings", label: "Settings" },
 ];
 

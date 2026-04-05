@@ -549,14 +549,24 @@ describe("Feedback Routes", () => {
     it("user-only routes use the configured userAuth", () => {
       const userOnlyPaths = [
         { method: "POST", path: "/feedback" },
-        { method: "GET", path: "/feedback" },
-        { method: "GET", path: "/feedback/:id" },
         { method: "POST", path: "/feedback/:id/vote" },
       ];
 
       for (const { method, path } of userOnlyPaths) {
         const route = findRoute(method, path);
         assert.deepEqual(route.auth, { strategy: "test" }, `${method} ${path}`);
+      }
+    });
+
+    it("read routes allow anonymous access with optional user auth", () => {
+      const readOnlyPaths = [
+        { method: "GET", path: "/feedback" },
+        { method: "GET", path: "/feedback/:id" },
+      ];
+
+      for (const { method, path } of readOnlyPaths) {
+        const route = findRoute(method, path);
+        assert.deepEqual(route.auth, [{ strategy: "test", optional: true }], `${method} ${path}`);
       }
     });
 

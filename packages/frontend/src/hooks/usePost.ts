@@ -7,6 +7,28 @@ import { apiFetch } from "@/lib/api";
 import type { Post, ThreadPost, CreatePostRequest } from "@/lib/types";
 import { useToast } from "@/providers/ToastProvider";
 
+const MAX_PARENT_DEPTH = 20;
+
+export function useParentChain(post: Post | undefined) {
+  return useQuery<Post[]>({
+    queryKey: ["post", post?.id, "parents"],
+    queryFn: async () => {
+      const chain: Post[] = [];
+      const seen = new Set<string>();
+      let currentId = post?.parent_id ?? null;
+      while (currentId && chain.length < MAX_PARENT_DEPTH) {
+        if (seen.has(currentId)) break;
+        seen.add(currentId);
+        const parent = await apiFetch<Post>(`/posts/${currentId}`);
+        chain.unshift(parent);
+        currentId = parent.parent_id;
+      }
+      return chain;
+    },
+    enabled: !!post?.parent_id,
+  });
+}
+
 export function usePost(id: string | null) {
   return useQuery<Post>({
     queryKey: ["post", id],

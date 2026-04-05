@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { Icon } from "@/components/Icon";
 import { ImageDisplay } from "@/components/ImageDisplay";
 import type { PostAttachment } from "@/lib/types";
@@ -12,6 +13,17 @@ interface ImageLightboxProps {
 }
 
 export function ImageLightbox({ attachments, openIndex, onClose, onNavigate }: ImageLightboxProps) {
+  useEffect(() => {
+    if (openIndex === null) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowLeft" && openIndex > 0) onNavigate(openIndex - 1);
+      if (e.key === "ArrowRight" && openIndex < attachments.length - 1) onNavigate(openIndex + 1);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [openIndex, attachments.length, onClose, onNavigate]);
+
   if (openIndex === null || attachments.length === 0) return null;
 
   const sorted = [...attachments].sort((a, b) => a.position - b.position);

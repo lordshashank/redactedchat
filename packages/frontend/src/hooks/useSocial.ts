@@ -22,13 +22,13 @@ export function useLike() {
       // Optimistically update all feed caches
       queryClient.setQueriesData(
         { queryKey: ["feed"], exact: false },
-        (old: any) => {
+        (old: { pages?: { data?: { id: string }[] }[] }) => {
           if (!old?.pages) return old;
           return {
             ...old,
-            pages: old.pages.map((page: any) => ({
+            pages: old.pages.map((page) => ({
               ...page,
-              data: page.data.map((post: any) =>
+              data: page.data?.map((post) =>
                 post.id === postId
                   ? {
                       ...post,
@@ -69,13 +69,13 @@ export function useBookmark() {
       // Update all feed caches
       queryClient.setQueriesData(
         { queryKey: ["feed"], exact: false },
-        (old: any) => {
+        (old: { pages?: { data?: { id: string }[] }[] }) => {
           if (!old?.pages) return old;
           return {
             ...old,
-            pages: old.pages.map((page: any) => ({
+            pages: old.pages.map((page) => ({
               ...page,
-              data: page.data.map((post: any) =>
+              data: page.data?.map((post) =>
                 post.id === postId
                   ? { ...post, viewer_bookmarked: data.bookmarked }
                   : post,
