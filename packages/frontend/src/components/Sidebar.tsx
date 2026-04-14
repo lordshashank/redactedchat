@@ -166,15 +166,15 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* New Proof CTA */}
+      {/* New Proof / Login CTA */}
       <div className="mt-auto pt-6">
         <Link
           href="/setup"
-          data-tooltip="New Profile"
+          data-tooltip={isAuthenticated ? "New Profile" : "Login"}
           className="sidebar-tooltip w-full bg-primary/10 border border-primary text-primary font-bold py-3 px-4 flex items-center justify-center gap-2 active:scale-95 transition-all hover:bg-primary/20"
         >
-          <Icon name="add_circle" className="text-sm md:text-xl lg:text-sm" />
-          <span className="hidden lg:inline">New Profile</span>
+          <Icon name={isAuthenticated ? "add_circle" : "login"} className="text-sm md:text-xl lg:text-sm" />
+          <span className="hidden lg:inline">{isAuthenticated ? "New Profile" : "Login"}</span>
         </Link>
       </div>
     </aside>

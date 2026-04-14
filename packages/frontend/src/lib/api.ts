@@ -57,10 +57,14 @@ export async function apiFetch<T>(
       body = await res.text().catch(() => null);
     }
 
-    const message =
+    let message =
       body && typeof body === "object" && "error" in body
         ? (body as { error: string }).error
         : `API error: ${res.status}`;
+
+    if (res.status === 401) {
+      message = "Unauthorized: Please Login";
+    }
 
     const err = new ApiError(res.status, body, message);
     captureError(err, {
